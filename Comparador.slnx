@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Comparador.App/Comparador.App.csproj" />
+    <Project Path="src/Comparador.Nucleo/Comparador.Nucleo.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Comparador.Pruebas/Comparador.Pruebas.csproj" />
+  </Folder>
+</Solution>
