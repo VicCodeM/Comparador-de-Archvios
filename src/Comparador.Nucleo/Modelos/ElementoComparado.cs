@@ -53,7 +53,11 @@ public sealed class ElementoComparado : INotifyPropertyChanged
     public EstadoElemento Estado
     {
         get => estado;
-        set => Cambiar(ref estado, value);
+        set
+        {
+            Cambiar(ref estado, value);
+            Avisar(nameof(SePuedeSincronizar));
+        }
     }
 
     public string Motivo
@@ -78,6 +82,8 @@ public sealed class ElementoComparado : INotifyPropertyChanged
         }
 
         campo = valor;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propiedad));
+        Avisar(propiedad);
     }
+
+    private void Avisar(string propiedad) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propiedad));
 }

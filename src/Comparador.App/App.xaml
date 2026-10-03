@@ -1,9 +1,23 @@
-﻿<Application x:Class="Comparador.App.App"
+<Application x:Class="Comparador.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Comparador.App"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:conv="clr-namespace:Comparador.App.Convertidores"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <materialDesign:BundledTheme BaseTheme="Light" PrimaryColor="DeepPurple" SecondaryColor="Amber" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <conv:PasoAVisibilidadConverter x:Key="PasoAVis" />
+            <conv:TamanoFormatoConverter x:Key="TamanoFormato" />
+            <conv:FechaFormatoConverter x:Key="FechaFormato" />
+            <conv:EstadoAIconoConverter x:Key="EstadoAIcono" />
+            <conv:EstadoABrushConverter x:Key="EstadoABrush" />
+            <conv:FiltroEsIgualConverter x:Key="FiltroEsIgual" />
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
