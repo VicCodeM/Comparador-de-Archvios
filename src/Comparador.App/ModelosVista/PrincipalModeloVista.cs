@@ -68,7 +68,9 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Avisos = new AvisosModeloVista();
         Origen = new SelectorUbicacionModeloVista("Origen", Avisos);
         Destino = new SelectorUbicacionModeloVista("Destino", Avisos);
-        Revision = new RevisionModeloVista(Avisos);
+        var acciones = new AccionesArchivo(Avisos);
+        Revision = new RevisionModeloVista(Avisos, acciones);
+        Terminados = new TerminadosModeloVista(acciones);
         Menu =
         [
             new EntradaMenu(Pagina.Ubicaciones, "Ubicaciones", SymbolRegular.FolderSwap24),
@@ -105,6 +107,14 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     public RevisionModeloVista Revision { get; }
 
     public ProgresoModeloVista Progreso { get; } = new();
+
+    public TerminadosModeloVista Terminados { get; }
+
+    /// <summary>
+    /// Casi nunca hace falta: solo para carpetas que Windows protege (de otros usuarios o del sistema). Ojo: como
+    /// administrador no se ven las unidades de red mapeadas (Z:), solo las rutas \\servidor\carpeta.
+    /// </summary>
+    public bool EsAdministrador { get; } = Elevacion.EsAdministrador();
 
     public IReadOnlyList<EntradaMenu> Menu { get; }
 
@@ -234,6 +244,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         OnPropertyChanged(nameof(EstadoBarraTareas));
         IniciarComparacionCommand.NotifyCanExecuteChanged();
         IniciarCopiaCommand.NotifyCanExecuteChanged();
+        ReintentarFallidosCommand.NotifyCanExecuteChanged();
         ActualizarMenu();
     }
 
@@ -383,7 +394,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         }
 
         var progreso = new ProgresoOperacion();
-        Progreso.Seguir(progreso);
+        Progreso.Seguir(progreso, Terminados);
         CopiaTerminada = false;
         OperacionActual = Operacion.Copiando;
         PaginaActual = Pagina.Copia;
@@ -396,9 +407,10 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             var resumen = await new SincronizadorArchivos().SincronizarAsync(
                 Revision.Todos, VerificarCopias, HilosAutomaticos ? null : (int)Hilos, progreso, cancelacion.Token);
             SeveridadCopia = resumen.Fallidos.IsEmpty ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
+            var copiados = Formatos.Cantidad(resumen.Copiados, "elemento copiado", "elementos copiados");
             ResumenCopia = resumen.Fallidos.IsEmpty
-                ? $"Se copiaron {resumen.Copiados:N0} elementos en {Formatos.Duracion(reloj.Elapsed)}" + (VerificarCopias ? ", todos verificados con SHA-256." : ".")
-                : $"Se copiaron {resumen.Copiados:N0} elementos y {resumen.Fallidos.Count:N0} fallaron. Abajo está el motivo de cada uno.";
+                ? $"{copiados} en {Formatos.Duracion(reloj.Elapsed)}" + (VerificarCopias ? ", verificados con SHA-256." : ".")
+                : $"{copiados}; {Formatos.Cantidad(resumen.Fallidos.Count, "falló", "fallaron")}. Abajo está el motivo de cada uno.";
         }
         catch (OperationCanceledException)
         {
@@ -428,4 +440,23 @@ public sealed partial class PrincipalModeloVista : ObservableObject
 
     [RelayCommand]
     private void IrA(Pagina pagina) => PaginaActual = pagina;
+
+    /// <summary>Los que fallaron siguen marcados y pendientes: volver a copiar solo toca a esos (y a lo que siga marcado).</summary>
+    [RelayCommand(CanExecute = nameof(PuedeEmpezar))]
+    private Task ReintentarFallidosAsync() => IniciarCopiaAsync();
+
+    [RelayCommand]
+    private void ReiniciarComoAdministrador()
+    {
+        if (Ocupado)
+        {
+            Avisos.Advertir("Espera a que termine la operación en curso antes de reiniciar");
+            return;
+        }
+
+        if (Elevacion.ReiniciarElevado())
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
+    }
 }

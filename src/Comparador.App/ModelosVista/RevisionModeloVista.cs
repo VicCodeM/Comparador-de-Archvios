@@ -28,6 +28,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
 {
     private readonly DispatcherTimer esperaBusqueda = new() { Interval = TimeSpan.FromMilliseconds(300) };
     private readonly AvisosModeloVista avisos;
+    private readonly AccionesArchivo acciones;
     private IReadOnlyList<ElementoComparado> todos = [];
     private long seleccionados;
     private long bytesSeleccionados;
@@ -44,9 +45,10 @@ public sealed partial class RevisionModeloVista : ObservableObject
     [ObservableProperty] private int problemas;
     [ObservableProperty] private int iguales;
 
-    public RevisionModeloVista(AvisosModeloVista avisos)
+    public RevisionModeloVista(AvisosModeloVista avisos, AccionesArchivo acciones)
     {
         this.avisos = avisos;
+        this.acciones = acciones;
         esperaBusqueda.Tick += (_, _) => AplicarFiltro();
     }
 
@@ -203,50 +205,26 @@ public sealed partial class RevisionModeloVista : ObservableObject
     }
 
     [RelayCommand]
-    private void AbrirOrigen(ElementoComparado? elemento) => Intentar(() => Escritorio.Abrir(elemento!.RutaOrigen), elemento);
+    private void AbrirOrigen(ElementoComparado? elemento) => Con(elemento, e => acciones.Abrir(e.RutaOrigen));
 
     [RelayCommand]
-    private void MostrarOrigen(ElementoComparado? elemento) => Intentar(() => Escritorio.MostrarEnCarpeta(elemento!.RutaOrigen), elemento);
+    private void MostrarOrigen(ElementoComparado? elemento) => Con(elemento, e => acciones.Mostrar(e.RutaOrigen));
 
     [RelayCommand]
-    private void MostrarDestino(ElementoComparado? elemento) => Intentar(() => Escritorio.MostrarEnCarpeta(elemento!.RutaDestino), elemento);
+    private void MostrarDestino(ElementoComparado? elemento) => Con(elemento, e => acciones.Mostrar(e.RutaDestino));
 
     [RelayCommand]
-    private void CopiarRuta(ElementoComparado? elemento) => Intentar(() => Clipboard.SetText(elemento!.RutaOrigen), elemento);
+    private void CopiarRuta(ElementoComparado? elemento) => Con(elemento, e => acciones.Copiar(e.RutaOrigen, "la ruta"));
 
     [RelayCommand]
-    private async Task QuienLoUsaAsync(ElementoComparado? elemento)
+    private Task QuienLoUsaAsync(ElementoComparado? elemento) =>
+        elemento is null ? Task.CompletedTask : acciones.QuienLoUsaAsync(elemento.Nombre, elemento.RutaOrigen, elemento.RutaDestino);
+
+    private static void Con(ElementoComparado? elemento, Action<ElementoComparado> accion)
     {
-        if (elemento is null)
+        if (elemento is not null)
         {
-            return;
-        }
-
-        var programas = await Task.Run(() => DetectorBloqueos.QuienLoUsa(elemento.RutaOrigen).Concat(DetectorBloqueos.QuienLoUsa(elemento.RutaDestino)).Distinct().ToList());
-        if (programas.Count == 0)
-        {
-            avisos.Informar($"Ningún programa tiene abierto \"{elemento.Nombre}\" ahora mismo");
-        }
-        else
-        {
-            avisos.Advertir($"\"{elemento.Nombre}\" está abierto en: {string.Join(", ", programas)}. Ciérralo y vuelve a copiar.");
-        }
-    }
-
-    private void Intentar(Action accion, ElementoComparado? elemento)
-    {
-        if (elemento is null)
-        {
-            return;
-        }
-
-        try
-        {
-            accion();
-        }
-        catch (Exception error) when (error is System.ComponentModel.Win32Exception or System.IO.IOException or System.Runtime.InteropServices.ExternalException)
-        {
-            avisos.Error($"No se pudo: {error.Message}");
+            accion(elemento);
         }
     }
 }

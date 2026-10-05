@@ -58,7 +58,7 @@ public sealed class SincronizadorArchivos
         foreach (var carpeta in carpetas.OrderBy(carpeta => carpeta.RutaRelativa.Length))
         {
             cancelacion.ThrowIfCancellationRequested();
-            var archivo = progreso.Empezar(carpeta.RutaRelativa, 0, "Creando carpeta");
+            var archivo = progreso.Empezar(carpeta.RutaRelativa, 0, "Creando carpeta", carpeta.RutaOrigen, carpeta.RutaDestino);
             try
             {
                 ubicaciones[carpeta.Par].Destino.CrearCarpeta(carpeta.RutaRelativa);
@@ -77,13 +77,18 @@ public sealed class SincronizadorArchivos
         ElementoComparado elemento, IUbicacion origen, IUbicacion destino, bool verificar,
         ProgresoOperacion progreso, ResumenSincronizacion resumen, CancellationToken cancelacion)
     {
-        var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando");
+        var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando", elemento.RutaOrigen, elemento.RutaDestino);
         var exito = false;
         try
         {
             await CopiaSegura.CopiarAsync(origen, destino, elemento.RutaRelativa, verificar, archivo, progreso, cancelacion);
             MarcarSincronizado(elemento, verificar ? "Copiado y verificado (SHA-256)" : "Copiado", resumen);
             exito = true;
+        }
+        catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
+        {
+            // Cancelar corta la copia aquí mismo; el bucle ya no empieza otras y avisa al terminar. Atraparla
+            // dentro evita que salga hacia el código de .NET, donde el depurador se detiene creyendo que es un error.
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {

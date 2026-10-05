@@ -22,7 +22,7 @@ public sealed record InstantaneaProgreso(
 }
 
 /// <summary>Un archivo que se está copiando o leyendo ahora mismo. Los hilos solo suman bytes; la ventana lo lee.</summary>
-public sealed class ArchivoEnCurso(string rutaRelativa, long tamano)
+public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string rutaOrigen, string rutaDestino)
 {
     private long bytes;
     private long acumulado;
@@ -30,6 +30,11 @@ public sealed class ArchivoEnCurso(string rutaRelativa, long tamano)
     public string RutaRelativa { get; } = rutaRelativa;
 
     public long Tamano { get; } = tamano;
+
+    /// <summary>Rutas completas, para abrir o mostrar el archivo desde la lista de terminados.</summary>
+    public string RutaOrigen { get; } = rutaOrigen;
+
+    public string RutaDestino { get; } = rutaDestino;
 
     /// <summary>Para mostrarlos en el orden en que empezaron, sin que salten de lugar.</summary>
     public long Inicio { get; } = Stopwatch.GetTimestamp();
@@ -56,7 +61,7 @@ public sealed class ArchivoEnCurso(string rutaRelativa, long tamano)
 }
 
 /// <summary>Un archivo que ya terminó, bien o mal, con lo que pasó.</summary>
-public sealed record ArchivoTerminado(string RutaRelativa, long Tamano, bool Exito, string Mensaje, DateTime Hora);
+public sealed record ArchivoTerminado(string RutaRelativa, string RutaOrigen, string RutaDestino, long Tamano, bool Exito, string Mensaje, DateTime Hora);
 
 /// <summary>
 /// Progreso compartido entre el trabajo (que solo suma contadores, sin avisar a nadie) y la ventana (que lo lee
@@ -94,9 +99,9 @@ public sealed class ProgresoOperacion
 
     public void MarcarActual(string descripcion) => actual = descripcion;
 
-    public ArchivoEnCurso Empezar(string rutaRelativa, long tamano, string etapa)
+    public ArchivoEnCurso Empezar(string rutaRelativa, long tamano, string etapa, string rutaOrigen = "", string rutaDestino = "")
     {
-        var archivo = new ArchivoEnCurso(rutaRelativa, tamano) { Etapa = etapa };
+        var archivo = new ArchivoEnCurso(rutaRelativa, tamano, rutaOrigen, rutaDestino) { Etapa = etapa };
         enCurso.TryAdd(archivo, 0);
         actual = rutaRelativa;
 
@@ -119,7 +124,7 @@ public sealed class ProgresoOperacion
     public void Terminar(ArchivoEnCurso archivo, bool exito, string mensaje)
     {
         enCurso.TryRemove(archivo, out _);
-        terminados.Enqueue(new ArchivoTerminado(archivo.RutaRelativa, archivo.Tamano, exito, mensaje, DateTime.Now));
+        terminados.Enqueue(new ArchivoTerminado(archivo.RutaRelativa, archivo.RutaOrigen, archivo.RutaDestino, archivo.Tamano, exito, mensaje, DateTime.Now));
         Avanzar();
     }
 

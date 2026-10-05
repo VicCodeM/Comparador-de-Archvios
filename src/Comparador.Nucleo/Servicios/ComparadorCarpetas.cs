@@ -196,7 +196,7 @@ public sealed class ComparadorCarpetas
         var opciones = new ParallelOptions { MaxDegreeOfParallelism = progreso.Hilos.Hilos, CancellationToken = cancelacion };
         await Parallel.ForEachAsync(elementos, opciones, async (elemento, token) =>
         {
-            var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Leyendo el origen");
+            var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Leyendo el origen", elemento.RutaOrigen, elemento.RutaDestino);
             (elemento.Estado, elemento.Motivo) = await CompararHuellasAsync(elemento, archivo, progreso, token);
             elemento.Seleccionado = true;
             progreso.AjustarBytes(archivo, 2 * elemento.TamanoACopiar);
@@ -226,6 +226,10 @@ public sealed class ComparadorCarpetas
         catch (UnauthorizedAccessException)
         {
             return (EstadoElemento.Error, "Sin permiso para leer el archivo");
+        }
+        catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
+        {
+            return (elemento.Estado, "Comparación cancelada antes de leer este archivo");
         }
     }
 }

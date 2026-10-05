@@ -56,6 +56,21 @@
                 </StackPanel>
             </ui:CardExpander>
 
+            <TextBlock Text="Permisos" Style="{StaticResource TituloSeccion}" />
+            <ui:CardControl Icon="{ui:SymbolIcon ShieldTask24}">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Abrir como administrador" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
+                                   Text="Casi nunca hace falta. Solo sirve para carpetas que Windows protege (de otro usuario o del sistema), las que salen como &quot;Sin acceso&quot;. Ojo: como administrador no se ven las unidades de red con letra (Z:); usa la ruta de red completa." />
+                        <TextBlock Text="Ya está abierta como administrador" Margin="0,4,0,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                   Visibility="{Binding EsAdministrador, Converter={StaticResource BoolAVisible}}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:Button Content="Reiniciar como administrador" Command="{Binding ReiniciarComoAdministradorCommand}"
+                           Visibility="{Binding EsAdministrador, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+            </ui:CardControl>
+
             <TextBlock Text="Apariencia" Style="{StaticResource TituloSeccion}" />
             <ui:CardControl Icon="{ui:SymbolIcon ColorBackground24}">
                 <ui:CardControl.Header>

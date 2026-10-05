@@ -25,4 +25,7 @@ public static class Formatos
     public static string Duracion(TimeSpan duracion) => duracion.TotalHours >= 1
         ? $"{(int)duracion.TotalHours} h {duracion.Minutes} min"
         : duracion.TotalMinutes >= 1 ? $"{duracion.Minutes} min {duracion.Seconds} s" : $"{Math.Max(duracion.Seconds, 0)} s";
+
+    /// <summary>"1 elemento copiado", "3 elementos copiados".</summary>
+    public static string Cantidad(long cuantos, string singular, string plural) => $"{cuantos:N0} {(cuantos == 1 ? singular : plural)}";
 }

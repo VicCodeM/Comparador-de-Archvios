@@ -28,28 +28,16 @@ public sealed partial class FilaEnCurso(ArchivoEnCurso archivo) : ObservableObje
     }
 }
 
-/// <summary>Un archivo terminado, como se ve en la lista.</summary>
-public sealed record FilaTerminada(string Nombre, string Carpeta, string Tamano, bool Exito, string Mensaje, string Hora)
-{
-    public static FilaTerminada Desde(ArchivoTerminado terminado) => new(
-        Path.GetFileName(terminado.RutaRelativa),
-        Path.GetDirectoryName(terminado.RutaRelativa) ?? string.Empty,
-        terminado.Tamano > 0 ? Formatos.Tamano(terminado.Tamano) : string.Empty,
-        terminado.Exito,
-        terminado.Mensaje,
-        terminado.Hora.ToString("HH:mm:ss"));
-}
-
 /// <summary>
 /// Pinta el progreso leyéndolo 4 veces por segundo. El trabajo nunca le avisa a la ventana por cada archivo:
-/// así la ventana responde igual con 10 archivos que con 10 millones. Los terminados se guardan solo los últimos
-/// (los errores, todos): una lista que crece sin fin con cada copia era otra forma de congelar la ventana.
+/// así la ventana responde igual con 10 archivos que con 10 millones. Los terminados pasan a la lista de
+/// <see cref="TerminadosModeloVista"/> en lotes, una vez por repintado.
 /// </summary>
 public sealed partial class ProgresoModeloVista : ObservableObject
 {
-    private const int MaximoRecientes = 200;
     private readonly DispatcherTimer reloj = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private ProgresoOperacion? seguido;
+    private TerminadosModeloVista? terminados;
     private long bytesAnteriores;
     private TimeSpan momentoAnterior;
     private double velocidadSuavizada;
@@ -62,33 +50,26 @@ public sealed partial class ProgresoModeloVista : ObservableObject
     [ObservableProperty] private string hilos = string.Empty;
     [ObservableProperty] private double porcentaje;
     [ObservableProperty] private bool indeterminado = true;
-    [ObservableProperty] private int correctos;
-    [ObservableProperty] private int fallidos;
 
     public ProgresoModeloVista() => reloj.Tick += (_, _) => Actualizar();
 
     public ObservableCollection<FilaEnCurso> EnCurso { get; } = [];
 
-    public ObservableCollection<FilaTerminada> Recientes { get; } = [];
-
-    public ObservableCollection<FilaTerminada> Errores { get; } = [];
-
-    public void Seguir(ProgresoOperacion progreso)
+    /// <param name="destinoTerminados">Dónde anotar cada archivo terminado (la copia), o null si no interesa (la comparación).</param>
+    public void Seguir(ProgresoOperacion progreso, TerminadosModeloVista? destinoTerminados = null)
     {
         seguido = progreso;
+        terminados = destinoTerminados;
+        terminados?.Empezar();
         Fase = string.Empty;
         Hilos = string.Empty;
         Velocidad = string.Empty;
         Restante = string.Empty;
         Transcurrido = string.Empty;
-        Correctos = 0;
-        Fallidos = 0;
         bytesAnteriores = 0;
         momentoAnterior = TimeSpan.Zero;
         velocidadSuavizada = 0;
         EnCurso.Clear();
-        Recientes.Clear();
-        Errores.Clear();
         reloj.Start();
         Actualizar();
     }
@@ -100,6 +81,8 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         EnCurso.Clear();
         Velocidad = string.Empty;
         Restante = string.Empty;
+        terminados?.Terminar();
+        terminados = null;
         seguido = null;
     }
 
@@ -126,7 +109,8 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         Hilos = DescribirHilos(seguido.Hilos);
         ActualizarVelocidad(foto);
         ActualizarEnCurso(seguido.EnCurso());
-        AgregarTerminados(seguido.TomarTerminados());
+        var lote = seguido.TomarTerminados();
+        terminados?.Agregar(lote);
     }
 
     private static string DescribirHilos(DecisionHilos decision) => decision.Motivo.Length == 0
@@ -154,27 +138,6 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         foreach (var fila in EnCurso)
         {
             fila.Actualizar();
-        }
-    }
-
-    private void AgregarTerminados(IReadOnlyList<ArchivoTerminado> lote)
-    {
-        Correctos += lote.Count(terminado => terminado.Exito);
-        Fallidos += lote.Count(terminado => !terminado.Exito);
-        foreach (var terminado in lote.Where(terminado => !terminado.Exito))
-        {
-            Errores.Add(FilaTerminada.Desde(terminado));
-        }
-
-        // Con miles de archivos pequeños llegan miles por repintado: solo los últimos llegan a verse.
-        foreach (var terminado in lote.TakeLast(MaximoRecientes))
-        {
-            Recientes.Insert(0, FilaTerminada.Desde(terminado));
-        }
-
-        while (Recientes.Count > MaximoRecientes)
-        {
-            Recientes.RemoveAt(Recientes.Count - 1);
         }
     }
 

@@ -6,48 +6,101 @@
              xmlns:mv="clr-namespace:Comparador.App.ModelosVista">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="160" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="40,28,40,24" MaxWidth="1000">
-                <TextBlock Text="Copiando" Style="{StaticResource TituloPagina}"
-                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
-                <TextBlock Text="Copia terminada" Style="{StaticResource TituloPagina}"
-                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+        <!-- Avance (mientras copia) o resumen (al terminar) -->
+        <StackPanel Margin="40,28,40,0">
+            <TextBlock Text="Copiando" Style="{StaticResource TituloPagina}"
+                       Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
+            <TextBlock Text="Copia terminada" Style="{StaticResource TituloPagina}"
+                       Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+            <vistas:PanelProgreso DataContext="{Binding Progreso}"
+                                  Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolAVisible}}" />
+            <ui:InfoBar Title="{Binding ResumenCopia}" Severity="{Binding SeveridadCopia}" IsOpen="True" IsClosable="False"
+                        Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+        </StackPanel>
 
-                <vistas:PanelProgreso DataContext="{Binding Progreso}" Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolAVisible}}" />
+        <!-- Filtros y búsqueda de lo terminado -->
+        <Grid Grid.Row="1" DataContext="{Binding Terminados}" Margin="40,20,40,10"
+              Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TituloSeccion}" Margin="2,0,0,8">
+                <Run Text="Terminados" />
+                <Run Text="(se muestran los últimos 200 mientras copia; al terminar, todos)" FontWeight="Normal" FontSize="12"
+                     Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </TextBlock>
+            <WrapPanel Grid.Row="1">
+                <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=Todos}">
+                    <TextBlock><Run Text="Todos " /><Run Text="{Binding Total, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
+                </ToggleButton>
+                <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=Copiados}">
+                    <TextBlock><Run Text="Copiados " /><Run Text="{Binding Correctos, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
+                </ToggleButton>
+                <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=ConError}">
+                    <TextBlock><Run Text="Con error " /><Run Text="{Binding Fallidos, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
+                </ToggleButton>
+            </WrapPanel>
+            <ui:TextBox Grid.Row="1" Grid.Column="1" Width="340" Margin="0,0,0,6" VerticalAlignment="Top"
+                        Text="{Binding Busqueda, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Buscar por nombre o carpeta"
+                        Icon="{ui:SymbolIcon Search24}" ClearButtonEnabled="True" />
+        </Grid>
 
-                <ui:InfoBar Title="{Binding ResumenCopia}" Severity="{Binding SeveridadCopia}" IsOpen="True" IsClosable="False" Margin="0,0,0,4"
-                            Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
-                </ui:InfoBar>
+        <!-- La lista: clic derecho para abrir, mostrar en el Explorador, copiar la ruta o ver quién lo usa -->
+        <Border Grid.Row="2" DataContext="{Binding Terminados}" Style="{StaticResource Tarjeta}" Padding="8,4" Margin="40,0,40,16"
+                Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
+            <Grid>
+                <ui:ListView x:Name="ListaTerminados" ItemsSource="{Binding Lista}" ItemTemplate="{StaticResource PlantillaTerminado}"
+                             SelectionMode="Single" Background="Transparent" BorderThickness="0"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
+                             MouseDoubleClick="AlDobleClic">
+                    <ui:ListView.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="Abrir la copia" Icon="{ui:SymbolIcon Open24}"
+                                      Command="{Binding AbrirCopiaCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Abrir el original" Icon="{ui:SymbolIcon Open24}"
+                                      Command="{Binding AbrirOrigenCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Mostrar en el destino" Icon="{ui:SymbolIcon FolderOpen24}"
+                                      Command="{Binding MostrarDestinoCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Mostrar en el origen" Icon="{ui:SymbolIcon FolderOpen24}"
+                                      Command="{Binding MostrarOrigenCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <Separator />
+                            <MenuItem Header="Copiar la ruta" Icon="{ui:SymbolIcon Copy24}"
+                                      Command="{Binding CopiarRutaCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Copiar el motivo" Icon="{ui:SymbolIcon Copy24}"
+                                      Command="{Binding CopiarMotivoCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="¿Qué programa lo tiene abierto?" Icon="{ui:SymbolIcon LockClosed24}"
+                                      Command="{Binding QuienLoUsaCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        </ContextMenu>
+                    </ui:ListView.ContextMenu>
+                </ui:ListView>
+                <TextBlock Text="Nada coincide con el filtro o la búsqueda" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Style="{StaticResource TextoSecundario}"
+                           Visibility="{Binding Lista.Count, Converter={StaticResource HayAlgoAVisible}, ConverterParameter=!}" />
+            </Grid>
+        </Border>
 
-                <!-- Lo que falló, con su motivo: todos, para poder revisarlos -->
-                <TextBlock Style="{StaticResource TituloSeccion}" Visibility="{Binding Progreso.Fallidos, Converter={StaticResource HayAlgoAVisible}}">
-                    <Run Text="No se pudieron copiar" /><Run Text="{Binding Progreso.Fallidos, Mode=OneWay, StringFormat=' ({0:N0})'}" />
-                </TextBlock>
-                <Border Style="{StaticResource Tarjeta}" Padding="20,8" Visibility="{Binding Progreso.Fallidos, Converter={StaticResource HayAlgoAVisible}}">
-                    <ui:ListView ItemsSource="{Binding Progreso.Errores}" ItemTemplate="{StaticResource PlantillaTerminado}" MaxHeight="300"
-                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" Background="Transparent" BorderThickness="0" />
-                </Border>
-
-                <TextBlock Style="{StaticResource TituloSeccion}" Visibility="{Binding Progreso.Recientes.Count, Converter={StaticResource HayAlgoAVisible}}">
-                    <Run Text="Terminados" /><Run Text="{Binding Progreso.Correctos, Mode=OneWay, StringFormat=' · {0:N0} correctos'}" />
-                </TextBlock>
-                <Border Style="{StaticResource Tarjeta}" Padding="20,8" Visibility="{Binding Progreso.Recientes.Count, Converter={StaticResource HayAlgoAVisible}}">
-                    <ui:ListView ItemsSource="{Binding Progreso.Recientes}" ItemTemplate="{StaticResource PlantillaTerminado}" MaxHeight="420"
-                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" Background="Transparent" BorderThickness="0" />
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-
-        <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
-            <Grid MaxWidth="1000">
+        <Border Grid.Row="3" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
+            <Grid>
+                <TextBlock VerticalAlignment="Center" Style="{StaticResource TextoSecundario}"
+                           Text="Doble clic abre la copia. Clic derecho para más opciones." />
                 <ui:Button HorizontalAlignment="Right" Content="Cancelar" Command="{Binding CancelarCommand}" Icon="{ui:SymbolIcon Stop24}"
                            Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
+                    <ui:Button Content="Reintentar los que fallaron" Command="{Binding ReintentarFallidosCommand}" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                               Margin="0,0,8,0" Visibility="{Binding Terminados.Fallidos, Converter={StaticResource HayAlgoAVisible}}" />
                     <ui:Button Content="Volver a la comparación" Command="{Binding IrACommand}" CommandParameter="{x:Static mv:Pagina.Comparacion}" Margin="0,0,8,0" />
                     <ui:Button Content="Nueva comparación" Appearance="Primary" Command="{Binding IrACommand}" CommandParameter="{x:Static mv:Pagina.Ubicaciones}" />
                 </StackPanel>

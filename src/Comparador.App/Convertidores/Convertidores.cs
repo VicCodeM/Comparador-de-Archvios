@@ -36,11 +36,11 @@ public sealed class BoolAVisibleConverter : ConvertidorDeIda
         value is true != (parameter as string == "!") ? Visibility.Visible : Visibility.Collapsed;
 }
 
-/// <summary>Visible si el número es mayor que cero (o la lista tiene elementos).</summary>
+/// <summary>Visible si el número es mayor que cero (o la lista tiene elementos); con "!" visible si es cero.</summary>
 public sealed class HayAlgoAVisibleConverter : ConvertidorDeIda
 {
     public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is int cuantos && cuantos > 0 ? Visibility.Visible : Visibility.Collapsed;
+        value is int and > 0 != (parameter as string == "!") ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public sealed class TamanoConverter : ConvertidorDeIda
