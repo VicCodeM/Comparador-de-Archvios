@@ -13,6 +13,9 @@
     <Window.DataContext>
         <mv:PrincipalModeloVista />
     </Window.DataContext>
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo ProgressState="{Binding EstadoBarraTareas}" ProgressValue="{Binding AvanceBarraTareas}" />
+    </Window.TaskbarItemInfo>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -27,21 +30,29 @@
         </ui:TitleBar>
 
         <Grid Grid.Row="1">
+            <!-- El menú se ensancha o se angosta arrastrando su borde, y se pliega a solo iconos con el botón -->
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
+                <ColumnDefinition x:Name="ColumnaMenu" Width="280" MinWidth="60" MaxWidth="420" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Menú lateral: los pasos se pueden pulsar en cuanto hay algo que ver en ellos -->
-            <DockPanel Margin="8,4,8,12">
+            <DockPanel Margin="8,4,8,12" ClipToBounds="True" SizeChanged="AlCambiarAnchoMenu">
+                <ui:Button DockPanel.Dock="Top" Appearance="Transparent" Margin="2,0,0,6" Padding="10,8"
+                           Click="PlegarMenu" ToolTip="Plegar o desplegar el menú">
+                    <ui:SymbolIcon Symbol="LineHorizontal320" FontSize="18" />
+                </ui:Button>
                 <StackPanel DockPanel.Dock="Bottom">
                     <Separator Margin="4,8" />
                     <ContentControl Content="{Binding MenuInferior}" ContentTemplate="{StaticResource PlantillaMenu}" />
-                    <TextBlock Text="Creado por Ing. Victor Maldonado - VMSofts" Margin="12,12,12,0"
+                    <TextBlock x:Name="Credito" Text="Creado por Ing. Victor Maldonado - VMSofts" Margin="12,12,12,0"
                                Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" />
                 </StackPanel>
                 <ItemsControl ItemsSource="{Binding Menu}" ItemTemplate="{StaticResource PlantillaMenu}" Focusable="False" />
             </DockPanel>
+
+            <GridSplitter Grid.Column="0" Width="6" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                          Background="Transparent" Cursor="SizeWE" ResizeBehavior="CurrentAndNext" />
 
             <!-- Área de contenido, con la esquina redondeada y la capa de PowerToys -->
             <Border Grid.Column="1"

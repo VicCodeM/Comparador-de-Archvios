@@ -36,6 +36,9 @@ public sealed record Configuracion
 
     public int Hilos { get; init; } = 4;
 
+    /// <summary>Que Windows no se suspenda mientras se compara o se copia (se vuelve a permitir al terminar).</summary>
+    public bool EvitarSuspension { get; init; } = true;
+
     private static readonly string Archivo = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VMSofts", "ComparadorArchivos", "configuracion.json");
 

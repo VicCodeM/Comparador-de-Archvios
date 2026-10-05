@@ -15,9 +15,16 @@
                 <ProgressBar Margin="0,12" Height="4" Maximum="100" Value="{Binding Porcentaje, Mode=OneWay}" IsIndeterminate="{Binding Indeterminado}" />
                 <Grid>
                     <TextBlock Text="{Binding Detalle}" />
-                    <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                        <Run Text="{Binding Velocidad, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding Restante, Mode=OneWay}" />
-                    </TextBlock>
+                    <TextBlock HorizontalAlignment="Right" Text="{Binding Velocidad}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </Grid>
+                <!-- El tiempo restante, a la vista: es lo primero que se busca en una copia larga -->
+                <Grid Margin="0,10,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Timer24" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       Visibility="{Binding Restante, Converter={StaticResource IgualAVisible}, ConverterParameter=!}" />
+                        <TextBlock Text="{Binding Restante}" FontSize="16" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Transcurrido}" Style="{StaticResource TextoSecundario}" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
                             Visibility="{Binding Hilos, Converter={StaticResource IgualAVisible}, ConverterParameter=!}">

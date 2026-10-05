@@ -78,44 +78,42 @@
                 </StackPanel>
             </Grid>
 
-            <DataGrid Grid.Row="3" ItemsSource="{Binding Visibles}"
-                         AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                         SelectionMode="Extended" Style="{StaticResource Tabla}"
-                         EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                         VirtualizingPanel.ScrollUnit="Pixel">
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow" BasedOn="{StaticResource FilaTabla}">
-                        <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
-                        <Setter Property="ContextMenu">
-                            <Setter.Value>
-                                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem Header="Abrir" Icon="{ui:SymbolIcon Open24}"
-                                              Command="{Binding AbrirOrigenCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Mostrar en el origen" Icon="{ui:SymbolIcon FolderOpen24}"
-                                              Command="{Binding MostrarOrigenCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Mostrar en el destino" Icon="{ui:SymbolIcon FolderOpen24}"
-                                              Command="{Binding MostrarDestinoCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <MenuItem Header="Copiar la ruta" Icon="{ui:SymbolIcon Copy24}"
-                                              Command="{Binding CopiarRutaCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                    <Separator />
-                                    <MenuItem Header="¿Qué programa lo tiene abierto?" Icon="{ui:SymbolIcon LockClosed24}"
-                                              Command="{Binding QuienLoUsaCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                </ContextMenu>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </DataGrid.RowStyle>
+            <!-- IsReadOnly: si la tabla es editable, el primer clic en una casilla se gasta en "entrar a editar" la
+                 celda, que vuelve a crear la casilla y el clic se pierde. El menú es uno solo para toda la tabla
+                 (un menú por fila, con miles de filas, era lo que se trababa) y actúa sobre la fila pulsada. -->
+            <DataGrid x:Name="Tabla" Grid.Row="3" ItemsSource="{Binding Visibles}"
+                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                      SelectionMode="Single" SelectionUnit="FullRow" Style="{StaticResource Tabla}"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.ScrollUnit="Pixel" CanUserResizeColumns="True" CanUserReorderColumns="True"
+                      HorizontalScrollBarVisibility="Auto" FrozenColumnCount="1">
+                <DataGrid.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Abrir" Icon="{ui:SymbolIcon Open24}"
+                                  Command="{Binding AbrirOrigenCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Mostrar en el origen" Icon="{ui:SymbolIcon FolderOpen24}"
+                                  Command="{Binding MostrarOrigenCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Mostrar en el destino" Icon="{ui:SymbolIcon FolderOpen24}"
+                                  Command="{Binding MostrarDestinoCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Copiar la ruta" Icon="{ui:SymbolIcon Copy24}"
+                                  Command="{Binding CopiarRutaCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
+                        <MenuItem Header="¿Qué programa lo tiene abierto?" Icon="{ui:SymbolIcon LockClosed24}"
+                                  Command="{Binding QuienLoUsaCommand}" CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Width="44" CanUserResize="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding Seleccionado, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding SePuedeSincronizar}"
+                                <CheckBox IsChecked="{Binding Seleccionado, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Visibility="{Binding SePuedeSincronizar, Converter={StaticResource BoolAVisible}}"
                                           HorizontalAlignment="Center" MinWidth="0" Padding="0" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Estado" Width="145" SortMemberPath="Estado">
+                    <DataGridTemplateColumn Header="Estado" Width="170" SortMemberPath="Estado">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -125,17 +123,18 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Nombre" Width="2*" MinWidth="180" SortMemberPath="RutaRelativa">
+                    <DataGridTemplateColumn Header="Nombre" Width="2*" MinWidth="220" SortMemberPath="RutaRelativa">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Nombre}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Carpeta}" Style="{StaticResource TextoSecundario}" />
+                                    <TextBlock Text="{Binding Carpeta}" Style="{StaticResource TextoSecundario}"
+                                               Visibility="{Binding Carpeta, Converter={StaticResource IgualAVisible}, ConverterParameter=!}" />
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Motivo" Width="1.6*" MinWidth="140" Binding="{Binding Motivo}" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Motivo" Width="1.6*" MinWidth="220" Binding="{Binding Motivo}" IsReadOnly="True" />
                     <DataGridTextColumn Header="Tamaño origen" Width="105" Binding="{Binding TamanoOrigen, Converter={StaticResource Tamano}}" SortMemberPath="TamanoOrigen" IsReadOnly="True" />
                     <DataGridTextColumn Header="Tamaño destino" Width="110" Binding="{Binding TamanoDestino, Converter={StaticResource Tamano}}" SortMemberPath="TamanoDestino" IsReadOnly="True" />
                     <DataGridTextColumn Header="Fecha origen" Width="135" Binding="{Binding FechaOrigen, Converter={StaticResource Fecha}}" SortMemberPath="FechaOrigen" IsReadOnly="True" />

@@ -58,6 +58,7 @@ public sealed partial class ProgresoModeloVista : ObservableObject
     [ObservableProperty] private string detalle = string.Empty;
     [ObservableProperty] private string velocidad = string.Empty;
     [ObservableProperty] private string restante = string.Empty;
+    [ObservableProperty] private string transcurrido = string.Empty;
     [ObservableProperty] private string hilos = string.Empty;
     [ObservableProperty] private double porcentaje;
     [ObservableProperty] private bool indeterminado = true;
@@ -79,6 +80,7 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         Hilos = string.Empty;
         Velocidad = string.Empty;
         Restante = string.Empty;
+        Transcurrido = string.Empty;
         Correctos = 0;
         Fallidos = 0;
         bytesAnteriores = 0;
@@ -119,6 +121,7 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         Fase = foto.Fase;
         Indeterminado = !foto.TieneTotal;
         Porcentaje = foto.Porcentaje;
+        Transcurrido = "Lleva " + Formatos.Duracion(foto.Transcurrido);
         Detalle = DescribirConteo(foto);
         Hilos = DescribirHilos(seguido.Hilos);
         ActualizarVelocidad(foto);
@@ -191,6 +194,7 @@ public sealed partial class ProgresoModeloVista : ObservableObject
 
         if (segundos < 0.5)
         {
+            Restante = Restante.Length == 0 ? "Calculando el tiempo restante..." : Restante;
             return;
         }
 
@@ -201,6 +205,6 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         Velocidad = $"{Formatos.Tamano((long)Math.Max(velocidadSuavizada, 0))}/s";
         Restante = velocidadSuavizada > 0
             ? "Faltan unos " + Formatos.Duracion(TimeSpan.FromSeconds((foto.BytesTotal - foto.BytesProcesados) / velocidadSuavizada))
-            : string.Empty;
+            : "Calculando el tiempo restante...";
     }
 }

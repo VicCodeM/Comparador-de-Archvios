@@ -57,6 +57,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [ObservableProperty] private TemaApp tema;
     [ObservableProperty] private bool hilosAutomaticos = true;
     [ObservableProperty] private double hilos = 4;
+    [ObservableProperty] private bool evitarSuspension = true;
     [ObservableProperty] private bool copiaTerminada;
     [ObservableProperty] private string resumenCopia = string.Empty;
     [ObservableProperty] private InfoBarSeverity severidadCopia = InfoBarSeverity.Success;
@@ -78,6 +79,21 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         config = Configuracion.Cargar();
         AplicarConfiguracion();
         ActualizarMenu();
+        Progreso.PropertyChanged += (_, cambio) =>
+        {
+            if (cambio.PropertyName == nameof(ProgresoModeloVista.Restante))
+            {
+                ActualizarMenu();
+            }
+            else if (cambio.PropertyName == nameof(ProgresoModeloVista.Porcentaje))
+            {
+                OnPropertyChanged(nameof(AvanceBarraTareas));
+            }
+            else if (cambio.PropertyName == nameof(ProgresoModeloVista.Indeterminado))
+            {
+                OnPropertyChanged(nameof(EstadoBarraTareas));
+            }
+        };
     }
 
     public AvisosModeloVista Avisos { get; }
@@ -108,6 +124,13 @@ public sealed partial class PrincipalModeloVista : ObservableObject
 
     public bool MostrarTabla => !Comparando && Revision.HayResultado;
 
+    /// <summary>El avance en el botón de la barra de tareas de Windows, para verlo con la ventana minimizada.</summary>
+    public double AvanceBarraTareas => Progreso.Porcentaje / 100;
+
+    public System.Windows.Shell.TaskbarItemProgressState EstadoBarraTareas => !Ocupado
+        ? System.Windows.Shell.TaskbarItemProgressState.None
+        : Progreso.Indeterminado ? System.Windows.Shell.TaskbarItemProgressState.Indeterminate : System.Windows.Shell.TaskbarItemProgressState.Normal;
+
     public int HilosMinimo => Concurrencia.Minimo;
 
     public int HilosMaximo => Concurrencia.Maximo;
@@ -134,6 +157,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Tema = config.Tema;
         HilosAutomaticos = config.HilosAutomaticos;
         Hilos = config.Hilos;
+        EvitarSuspension = config.EvitarSuspension;
         CargarRecientes();
         if (Recientes.Count > 0)
         {
@@ -168,6 +192,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             Tema = Tema,
             HilosAutomaticos = HilosAutomaticos,
             Hilos = (int)Hilos,
+            EvitarSuspension = EvitarSuspension,
         };
         config.Guardar();
     }
@@ -181,6 +206,8 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     }
 
     partial void OnVerificarCopiasChanged(bool value) => Guardar();
+
+    partial void OnEvitarSuspensionChanged(bool value) => Guardar();
 
     partial void OnHilosAutomaticosChanged(bool value)
     {
@@ -204,6 +231,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         OnPropertyChanged(nameof(Comparando));
         OnPropertyChanged(nameof(Copiando));
         OnPropertyChanged(nameof(MostrarTabla));
+        OnPropertyChanged(nameof(EstadoBarraTareas));
         IniciarComparacionCommand.NotifyCanExecuteChanged();
         IniciarCopiaCommand.NotifyCanExecuteChanged();
         ActualizarMenu();
@@ -219,10 +247,12 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Menu[0].Disponible = true;
         Menu[0].Estado = string.Empty;
         Menu[1].Disponible = Comparando || Revision.HayResultado;
-        Menu[1].Estado = Comparando ? "En curso" : Revision.HayResultado ? $"{Revision.Pendientes:N0} por copiar" : string.Empty;
+        Menu[1].Estado = Comparando ? EnCurso() : Revision.HayResultado ? $"{Revision.Pendientes:N0} por copiar" : string.Empty;
         Menu[2].Disponible = Copiando || CopiaTerminada;
-        Menu[2].Estado = Copiando ? "En curso" : CopiaTerminada ? "Terminada" : string.Empty;
+        Menu[2].Estado = Copiando ? EnCurso() : CopiaTerminada ? "Terminada" : string.Empty;
     }
+
+    private string EnCurso() => Progreso.Restante.StartsWith("Faltan", StringComparison.Ordinal) ? Progreso.Restante : "En curso";
 
     [RelayCommand]
     private void Navegar(EntradaMenu? entrada)
@@ -312,7 +342,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         OperacionActual = Operacion.Comparando;
         PaginaActual = Pagina.Comparacion;
         cancelacion = new CancellationTokenSource();
-        using var suspension = PrevencionSuspension.Activar();
+        using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
         try
         {
             var resultado = await new ComparadorCarpetas().CompararAsync(pares, opciones, progreso, cancelacion.Token);
@@ -360,7 +390,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Revision.PausarAvisos();
         cancelacion = new CancellationTokenSource();
         var reloj = Stopwatch.StartNew();
-        using var suspension = PrevencionSuspension.Activar();
+        using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
         try
         {
             var resumen = await new SincronizadorArchivos().SincronizarAsync(
