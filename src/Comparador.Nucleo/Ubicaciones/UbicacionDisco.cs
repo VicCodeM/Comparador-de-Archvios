@@ -9,6 +9,8 @@ namespace Comparador.Nucleo.Ubicaciones;
 public sealed class UbicacionDisco(string raiz) : IUbicacion
 {
     private const int TamanoBloque = 4 * 1024 * 1024;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> carpetasCreadas = new(StringComparer.OrdinalIgnoreCase);
+    private PerfilDisco? perfil;
 
     private static readonly EnumerationOptions SoloEsteNivel = new()
     {
@@ -24,14 +26,27 @@ public sealed class UbicacionDisco(string raiz) : IUbicacion
 
     public bool FechasFiables => true;
 
+    /// <summary>El disco físico de verdad (SSD, mecánico, USB...), preguntado una vez y recordado.</summary>
+    public PerfilDisco Perfil => perfil ??= DetectorDiscos.Detectar(Raiz);
+
     public bool Existe() => Directory.Exists(Rutas.ParaIO(Raiz));
 
-    public void CrearCarpeta(string relativa) => Directory.CreateDirectory(Completa(relativa));
+    /// <summary>
+    /// Con miles de archivos en la misma carpeta, preguntarle a Windows por ella en cada uno es puro gasto: se recuerda
+    /// cuáles ya se crearon en esta sesión.
+    /// </summary>
+    public void CrearCarpeta(string relativa)
+    {
+        if (carpetasCreadas.TryAdd(relativa, 0))
+        {
+            Directory.CreateDirectory(RutaIO(relativa));
+        }
+    }
 
     public IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa) =>
-        new DirectoryInfo(Completa(relativa)).EnumerateFileSystemInfos("*", SoloEsteNivel).Select(info => Describir(relativa, info)).ToList();
+        new DirectoryInfo(RutaIO(relativa)).EnumerateFileSystemInfos("*", SoloEsteNivel).Select(info => Describir(relativa, info)).ToList();
 
-    public Stream AbrirLectura(string relativa) => new FileStream(Completa(relativa), new FileStreamOptions
+    public Stream AbrirLectura(string relativa) => new FileStream(RutaIO(relativa), new FileStreamOptions
     {
         Mode = FileMode.Open,
         Access = FileAccess.Read,
@@ -42,14 +57,14 @@ public sealed class UbicacionDisco(string raiz) : IUbicacion
 
     public MetadatosArchivo LeerMetadatos(string relativa)
     {
-        var info = new FileInfo(Completa(relativa));
+        var info = new FileInfo(RutaIO(relativa));
 
         return new MetadatosArchivo(info.CreationTime, info.LastWriteTime, info.Attributes);
     }
 
     public async Task EscribirAsync(string relativa, Stream contenido, CancellationToken cancelacion)
     {
-        var ruta = Completa(relativa);
+        var ruta = RutaIO(relativa);
         Directory.CreateDirectory(Path.GetDirectoryName(ruta)!);
         await using var escritura = new FileStream(ruta, new FileStreamOptions
         {
@@ -65,8 +80,8 @@ public sealed class UbicacionDisco(string raiz) : IUbicacion
 
     public void Reemplazar(string temporal, string definitiva, MetadatosArchivo metadatos)
     {
-        var rutaTemporal = Completa(temporal);
-        var rutaDefinitiva = Completa(definitiva);
+        var rutaTemporal = RutaIO(temporal);
+        var rutaDefinitiva = RutaIO(definitiva);
         if (metadatos.Creacion is { } creacion)
         {
             File.SetCreationTime(rutaTemporal, creacion);
@@ -77,21 +92,47 @@ public sealed class UbicacionDisco(string raiz) : IUbicacion
             File.SetLastWriteTime(rutaTemporal, modificacion);
         }
 
-        if (File.Exists(rutaDefinitiva))
-        {
-            File.SetAttributes(rutaDefinitiva, FileAttributes.Normal);
-        }
-
-        File.Move(rutaTemporal, rutaDefinitiva, overwrite: true);
+        MoverEncima(rutaTemporal, rutaDefinitiva);
         if (metadatos.Atributos is { } atributos)
         {
             File.SetAttributes(rutaDefinitiva, atributos);
         }
     }
 
-    public void BorrarArchivo(string relativa) => File.Delete(Completa(relativa));
+    /// <summary>
+    /// Reemplaza de una vez y solo si Windows se niega por ser de solo lectura se le quita ese atributo y se repite.
+    /// Preguntar antes "¿existe?" era una ida y vuelta más por archivo y, en red, la respuesta podía venir de una
+    /// caché vieja: decía que el archivo existía cuando ya no, y la copia fallaba.
+    /// </summary>
+    private static void MoverEncima(string rutaTemporal, string rutaDefinitiva)
+    {
+        try
+        {
+            File.Move(rutaTemporal, rutaDefinitiva, overwrite: true);
+        }
+        catch (UnauthorizedAccessException) when (EsSoloLectura(rutaDefinitiva))
+        {
+            File.SetAttributes(rutaDefinitiva, FileAttributes.Normal);
+            File.Move(rutaTemporal, rutaDefinitiva, overwrite: true);
+        }
+    }
 
-    private string Completa(string relativa) => Rutas.ParaIO(Path.Combine(Raiz, relativa));
+    private static bool EsSoloLectura(string ruta)
+    {
+        try
+        {
+            return File.GetAttributes(ruta).HasFlag(FileAttributes.ReadOnly);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    public void BorrarArchivo(string relativa) => File.Delete(RutaIO(relativa));
+
+    /// <summary>La ruta completa lista para Windows (con \\?\ para rutas largas).</summary>
+    public string RutaIO(string relativa) => Rutas.ParaIO(Path.Combine(Raiz, relativa));
 
     private static EntradaEscaneada Describir(string carpeta, FileSystemInfo info)
     {

@@ -40,14 +40,14 @@
                 </ui:CardExpander.Header>
                 <StackPanel Margin="40,0,0,0">
                     <Grid Margin="0,4">
-                        <TextBlock Text="Decidir según el dispositivo" VerticalAlignment="Center" />
+                        <TextBlock Text="Ajustar solo, midiendo la velocidad" VerticalAlignment="Center" />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding HilosAutomaticos}" />
                     </Grid>
                     <Grid Margin="0,12,0,4" IsEnabled="{Binding HilosAutomaticos, Converter={StaticResource NoEs}}">
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Copias a la vez" />
                             <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"
-                                       Text="En SSD y red, más hilos suelen ir más rápido. En memorias USB y discos mecánicos, más de 2 suele ir más lento." />
+                                       Text="Solo si quieres fijarlo a mano. En automático la app encuentra el mejor número en cada equipo y con cada tipo de archivo." />
                         </StackPanel>
                         <ui:NumberBox HorizontalAlignment="Right" Width="140" Value="{Binding Hilos, UpdateSourceTrigger=PropertyChanged}"
                                       Minimum="{Binding HilosMinimo}" Maximum="{Binding HilosMaximo}" SmallChange="1" MaxDecimalPlaces="0"

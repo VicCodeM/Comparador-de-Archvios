@@ -37,6 +37,20 @@ public sealed class SincronizadorArchivosPruebas : IDisposable
     }
 
     [Fact]
+    public async Task Reemplaza_un_destino_de_solo_lectura_y_le_devuelve_sus_atributos()
+    {
+        CarpetasDePrueba.Escribir(carpetas.Origen, "protegido.txt", "version nueva");
+        var destino = CarpetasDePrueba.Escribir(carpetas.Destino, "protegido.txt", "vieja");
+        File.SetAttributes(destino, FileAttributes.ReadOnly);
+
+        var (_, resumen) = await CompararYSincronizar(verificar: true);
+
+        Assert.Empty(resumen.Fallidos);
+        File.SetAttributes(destino, FileAttributes.Normal);
+        Assert.Equal("version nueva", File.ReadAllText(destino));
+    }
+
+    [Fact]
     public async Task Lo_no_seleccionado_no_se_toca()
     {
         CarpetasDePrueba.Escribir(carpetas.Origen, "a.txt", "a");

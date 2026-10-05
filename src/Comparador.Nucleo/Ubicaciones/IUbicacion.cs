@@ -11,7 +11,11 @@ public enum TipoUbicacion
 }
 
 /// <summary>Fechas y atributos que se le copian al archivo de destino. Lo que el origen no sabe va en null.</summary>
-public sealed record MetadatosArchivo(DateTime? Creacion, DateTime? Modificacion, FileAttributes? Atributos);
+public sealed record MetadatosArchivo(DateTime? Creacion, DateTime? Modificacion, FileAttributes? Atributos)
+{
+    /// <summary>El archivo ya los trae (la copia de Windows los conserva): no hay nada que poner.</summary>
+    public static MetadatosArchivo YaCopiados { get; } = new(null, null, null);
+}
 
 /// <summary>
 /// Una carpeta raíz donde se leen o escriben archivos: un disco, una memoria USB, una carpeta de red o un teléfono.

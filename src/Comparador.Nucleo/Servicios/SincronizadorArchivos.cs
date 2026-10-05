@@ -16,12 +16,16 @@ public sealed class ResumenSincronizacion
 }
 
 /// <summary>
-/// Copia lo que falta y reemplaza lo diferente, con tantas copias a la vez como diga <see cref="Concurrencia"/>.
+/// Copia lo que falta y reemplaza lo diferente. Las copias a la vez parten de <see cref="Concurrencia"/> y, en automático,
+/// las va ajustando <see cref="AjustadorHilos"/> según la velocidad que mide en este equipo.
 /// Cada elemento cambia SU estado al terminar; nada recorre la lista entera por cada archivo, que era lo que
 /// congelaba la versión anterior.
 /// </summary>
 public sealed class SincronizadorArchivos
 {
+    /// <summary>Lo bastante largo para que la velocidad medida no sea ruido, lo bastante corto para reaccionar pronto.</summary>
+    private static readonly TimeSpan TramoDeMedicion = TimeSpan.FromSeconds(1.5);
+
     public Task<ResumenSincronizacion> SincronizarAsync(
         IReadOnlyList<ElementoComparado> elementos, bool verificar, int? hilosManuales, ProgresoOperacion progreso, CancellationToken cancelacion) =>
         Task.Run(() => Sincronizar(elementos, verificar, hilosManuales, progreso, cancelacion), cancelacion);
@@ -34,22 +38,63 @@ public sealed class SincronizadorArchivos
         var ubicaciones = pendientes.Select(elemento => elemento.Par).Distinct()
             .ToDictionary(par => par, par => (Origen: CatalogoUbicaciones.Abrir(par.Origen), Destino: CatalogoUbicaciones.Abrir(par.Destino)));
         progreso.Hilos = Concurrencia.Decidir(hilosManuales, ubicaciones.Values.SelectMany(par => new[] { par.Origen, par.Destino }));
-        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, verificar)));
+        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], verificar)));
         var resumen = new ResumenSincronizacion();
         CrearCarpetas(pendientes.Where(elemento => elemento.EsCarpeta), ubicaciones, progreso, resumen, cancelacion);
-        var opciones = new ParallelOptions { MaxDegreeOfParallelism = progreso.Hilos.Hilos, CancellationToken = cancelacion };
-        await Parallel.ForEachAsync(archivos, opciones, (archivo, token) =>
+        var limite = new LimiteDinamico(progreso.Hilos.Hilos);
+        using var finAjuste = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
+        var ajuste = progreso.Hilos.SeAjusta ? AjustarMientrasCopiaAsync(limite, progreso, finAjuste.Token) : Task.CompletedTask;
+        var opciones = new ParallelOptions { MaxDegreeOfParallelism = Concurrencia.Maximo, CancellationToken = cancelacion };
+        try
         {
-            var (origen, destino) = ubicaciones[archivo.Par];
-
-            return new ValueTask(CopiarAsync(archivo, origen, destino, verificar, progreso, resumen, token));
-        });
+            await Parallel.ForEachAsync(archivos, opciones, async (archivo, token) =>
+            {
+                await limite.EsperarAsync(token);
+                try
+                {
+                    var (origen, destino) = ubicaciones[archivo.Par];
+                    await CopiarAsync(archivo, origen, destino, verificar, progreso, resumen, token);
+                }
+                finally
+                {
+                    limite.Liberar();
+                }
+            });
+        }
+        finally
+        {
+            await finAjuste.CancelAsync();
+            await ajuste;
+        }
 
         return resumen;
     }
 
-    /// <summary>Copiar lee el archivo una vez; verificar relee la copia otra vez.</summary>
-    private static long BytesEsperados(ElementoComparado archivo, bool verificar) => archivo.TamanoACopiar * (verificar ? 2 : 1);
+    /// <summary>Cada tramo mide lo avanzado y deja que el ajustador suba o baje los hilos; la pantalla lo ve en vivo.</summary>
+    private static async Task AjustarMientrasCopiaAsync(LimiteDinamico limite, ProgresoOperacion progreso, CancellationToken fin)
+    {
+        var ajustador = new AjustadorHilos(limite, Concurrencia.Minimo, Concurrencia.Maximo);
+        using var reloj = new PeriodicTimer(TramoDeMedicion);
+        var anterior = progreso.Instantanea();
+        try
+        {
+            while (await reloj.WaitForNextTickAsync(fin))
+            {
+                var actual = progreso.Instantanea();
+                var hilos = ajustador.Medir(
+                    actual.BytesProcesados - anterior.BytesProcesados, actual.Procesados - anterior.Procesados, actual.Transcurrido - anterior.Transcurrido);
+                progreso.Hilos = progreso.Hilos with { Hilos = hilos };
+                anterior = actual;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Terminó la copia (o se canceló): se deja de medir.
+        }
+    }
+
+    private static long BytesEsperados(ElementoComparado archivo, (IUbicacion Origen, IUbicacion Destino) par, bool verificar) =>
+        archivo.TamanoACopiar * CopiaSegura.Pasadas(par.Origen, par.Destino, verificar);
 
     private static void CrearCarpetas(
         IEnumerable<ElementoComparado> carpetas, Dictionary<ParRutas, (IUbicacion Origen, IUbicacion Destino)> ubicaciones,
@@ -96,7 +141,7 @@ public sealed class SincronizadorArchivos
         }
         finally
         {
-            progreso.AjustarBytes(archivo, BytesEsperados(elemento, verificar));
+            progreso.AjustarBytes(archivo, BytesEsperados(elemento, (origen, destino), verificar));
             progreso.Terminar(archivo, exito, cancelacion.IsCancellationRequested && !exito ? "Cancelado" : elemento.Motivo);
         }
     }
@@ -121,7 +166,7 @@ public sealed class SincronizadorArchivos
         UnauthorizedAccessException => "sin permiso para escribir en el destino",
         IOException when error.HResult == unchecked((int)0x80070070) => "no queda espacio en el disco de destino",
         IOException when error.HResult == unchecked((int)0x80070035) => "la carpeta de red no responde",
-        FileNotFoundException => "el archivo de origen ya no existe",
+        FileNotFoundException noEncontrado => $"no se encontró {Path.GetFileName(noEncontrado.FileName) ?? "el archivo"}",
         System.Runtime.InteropServices.COMException => "el teléfono rechazó la operación (¿se desconectó o se bloqueó la pantalla?)",
         _ => error.Message,
     };

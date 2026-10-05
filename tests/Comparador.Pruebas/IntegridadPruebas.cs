@@ -125,15 +125,75 @@ public sealed class ConcurrenciaPruebas
     }
 
     [Theory]
-    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, null, 4)]
-    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Usb, null, 2)]
-    [InlineData(TipoUbicacion.Red, TipoUbicacion.Disco, null, 4)]
-    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, 8, 8)]
-    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, 99, Concurrencia.Maximo)]
-    [InlineData(TipoUbicacion.Telefono, TipoUbicacion.Disco, 8, 1)]
-    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Telefono, null, 1)]
-    public void Decide_los_hilos_segun_los_dispositivos(TipoUbicacion origen, TipoUbicacion destino, int? manual, int esperado) =>
-        Assert.Equal(esperado, Concurrencia.Decidir(manual, [new Ubicacion(origen), new Ubicacion(destino)]).Hilos);
+    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, null, 4, true)]
+    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Usb, null, 4, true)]
+    [InlineData(TipoUbicacion.Red, TipoUbicacion.Disco, null, 4, true)]
+    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, 8, 8, false)]
+    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Disco, 99, Concurrencia.Maximo, false)]
+    [InlineData(TipoUbicacion.Telefono, TipoUbicacion.Disco, 8, 1, false)]
+    [InlineData(TipoUbicacion.Disco, TipoUbicacion.Telefono, null, 1, false)]
+    public void Decide_el_punto_de_partida_y_si_se_ajusta(TipoUbicacion origen, TipoUbicacion destino, int? manual, int esperado, bool seAjusta)
+    {
+        var decision = Concurrencia.Decidir(manual, [new Ubicacion(origen), new Ubicacion(destino)]);
+
+        Assert.Equal((esperado, seAjusta), (decision.Hilos, decision.SeAjusta));
+    }
+
+    /// <summary>Un equipo imaginario que rinde más con 6 copias a la vez y empeora con más.</summary>
+    private static long RendimientoSimulado(int hilos) => 100_000_000L * Math.Min(hilos, 6) - 30_000_000L * Math.Max(0, hilos - 6);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(20)]
+    public void El_ajustador_encuentra_el_punto_optimo_desde_cualquier_partida(int partida)
+    {
+        var limite = new LimiteDinamico(partida);
+        var ajustador = new AjustadorHilos(limite, Concurrencia.Minimo, Concurrencia.Maximo);
+
+        for (var tramo = 0; tramo < 120; tramo++)
+        {
+            ajustador.Medir(RendimientoSimulado(limite.Actual), 0, TimeSpan.FromSeconds(1));
+        }
+
+        Assert.InRange(limite.Actual, 5, 7);
+    }
+
+    [Fact]
+    public void Con_el_ruido_de_una_red_no_se_hunde_a_un_hilo()
+    {
+        var azar = new Random(1234);
+        var limite = new LimiteDinamico(4);
+        var ajustador = new AjustadorHilos(limite, Concurrencia.Minimo, Concurrencia.Maximo);
+        var vistos = new List<int>();
+
+        for (var tramo = 0; tramo < 400; tramo++)
+        {
+            var ruido = 1 + (azar.NextDouble() - 0.5) * 0.16;
+            ajustador.Medir((long)(RendimientoSimulado(limite.Actual) * ruido), 0, TimeSpan.FromSeconds(1));
+            vistos.Add(limite.Actual);
+        }
+
+        // Tras encontrarlo, pasa casi todo el tiempo cerca del óptimo (6).
+        Assert.True(vistos.Skip(100).Average() is > 4.5 and < 7.5, $"Promedio {vistos.Skip(100).Average():F1}");
+        Assert.True(vistos.Skip(100).Min() >= 3, $"Bajó hasta {vistos.Skip(100).Min()}");
+    }
+
+    [Fact]
+    public async Task Bajar_el_limite_hace_esperar_a_las_siguientes_sin_cortar_las_que_corren()
+    {
+        var limite = new LimiteDinamico(2);
+        await limite.EsperarAsync(CancellationToken.None);
+        await limite.EsperarAsync(CancellationToken.None);
+        limite.Cambiar(1);
+        limite.Liberar();
+        limite.Liberar();
+
+        await limite.EsperarAsync(CancellationToken.None);
+        using var espera = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => limite.EsperarAsync(espera.Token));
+    }
 
     [Theory]
     [InlineData(@"mtp:\\Pixel 8\Almacenamiento interno\DCIM", "Pixel 8", @"\Almacenamiento interno\DCIM")]

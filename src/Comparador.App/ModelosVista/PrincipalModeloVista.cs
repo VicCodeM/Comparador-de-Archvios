@@ -154,7 +154,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     }
 
     public string DescripcionHilos => HilosAutomaticos
-        ? "Automático: 2 en memorias USB, 4 en discos y red, 1 con teléfonos"
+        ? "Automático: mide la velocidad mientras copia y sube o baja los hilos hasta dar con lo que mejor rinde en este equipo (con teléfonos, siempre 1)"
         : $"{(int)Hilos} copias a la vez (con un teléfono siempre se usa 1)";
 
     private void AplicarConfiguracion()

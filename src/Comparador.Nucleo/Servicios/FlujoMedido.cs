@@ -6,7 +6,7 @@ namespace Comparador.Nucleo.Servicios;
 /// Envuelve un flujo de lectura: cuenta los bytes que pasan y calcula su SHA-256 al vuelo. Así la huella del origen
 /// sale de la misma lectura que hace la copia, sin leer el archivo dos veces (importa mucho en red y en teléfonos).
 /// </summary>
-public sealed class FlujoMedido(Stream interno, Action<int> alLeer) : Stream
+public sealed class FlujoMedido(Stream interno, Action<int> alLeer, bool calcularHuella = true) : Stream
 {
     private readonly IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
@@ -73,7 +73,11 @@ public sealed class FlujoMedido(Stream interno, Action<int> alLeer) : Stream
     {
         if (leidos.Length > 0)
         {
-            hash.AppendData(leidos);
+            if (calcularHuella)
+            {
+                hash.AppendData(leidos);
+            }
+
             alLeer(leidos.Length);
         }
 
