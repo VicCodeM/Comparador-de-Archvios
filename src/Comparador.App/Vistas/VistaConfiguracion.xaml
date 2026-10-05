@@ -1,0 +1,77 @@
+<UserControl x:Class="Comparador.App.Vistas.VistaConfiguracion"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,28,40,24" MaxWidth="1000">
+            <TextBlock Text="Configuración" Style="{StaticResource TituloPagina}" />
+
+            <TextBlock Text="Copia" Style="{StaticResource TituloSeccion}" Margin="2,0,0,8" />
+            <ui:CardControl Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,0,4">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Verificar cada copia con SHA-256" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap"
+                                   Text="Relee el archivo copiado y compara su huella con la del original antes de darlo por bueno. Si no coinciden, el destino no se toca." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding VerificarCopias}" />
+            </ui:CardControl>
+
+            <ui:CardExpander Icon="{ui:SymbolIcon Flash24}" IsExpanded="True">
+                <ui:CardExpander.Header>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Text="Hilos de copia" FontSize="14" />
+                            <TextBlock Style="{StaticResource TextoSecundario}" Text="{Binding DescripcionHilos}" />
+                        </StackPanel>
+                    </Grid>
+                </ui:CardExpander.Header>
+                <StackPanel Margin="40,0,0,0">
+                    <Grid Margin="0,4">
+                        <TextBlock Text="Decidir según el dispositivo" VerticalAlignment="Center" />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding HilosAutomaticos}" />
+                    </Grid>
+                    <Grid Margin="0,12,0,4" IsEnabled="{Binding HilosAutomaticos, Converter={StaticResource NoEs}}">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Copias a la vez" />
+                            <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"
+                                       Text="En SSD y red, más hilos suelen ir más rápido. En memorias USB y discos mecánicos, más de 2 suele ir más lento." />
+                        </StackPanel>
+                        <ui:NumberBox HorizontalAlignment="Right" Width="140" Value="{Binding Hilos, UpdateSourceTrigger=PropertyChanged}"
+                                      Minimum="{Binding HilosMinimo}" Maximum="{Binding HilosMaximo}" SmallChange="1" MaxDecimalPlaces="0"
+                                      SpinButtonPlacementMode="Inline" ClearButtonEnabled="False" />
+                    </Grid>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <TextBlock Text="Apariencia" Style="{StaticResource TituloSeccion}" />
+            <ui:CardControl Icon="{ui:SymbolIcon ColorBackground24}">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Tema" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" Text="Claro, oscuro o el mismo que Windows" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ComboBox ItemsSource="{Binding Temas}" SelectedItem="{Binding Tema}" Width="200">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource TemaTexto}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </ui:CardControl>
+
+            <TextBlock Text="Acerca de" Style="{StaticResource TituloSeccion}" />
+            <Border Style="{StaticResource Tarjeta}">
+                <StackPanel>
+                    <TextBlock Text="Comparador de Archivos" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Version}" Style="{StaticResource TextoSecundario}" Margin="0,2,0,8" />
+                    <TextBlock Text="Compara y copia entre discos, memorias USB, carpetas de red y teléfonos, sin dejar archivos a medias."
+                               TextWrapping="Wrap" Style="{StaticResource TextoSecundario}" />
+                    <TextBlock Text="Creado por Ing. Victor Maldonado - VMSofts" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

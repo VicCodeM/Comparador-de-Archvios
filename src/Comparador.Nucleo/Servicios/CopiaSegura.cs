@@ -1,5 +1,5 @@
-using System.Buffers;
 using Comparador.Nucleo.Modelos;
+using Comparador.Nucleo.Ubicaciones;
 
 namespace Comparador.Nucleo.Servicios;
 
@@ -11,33 +11,36 @@ public sealed class ArchivoEnUsoException(string programas, Exception interna)
 public sealed class CopiaNoIdenticaException() : IOException("La verificación SHA-256 falló: la copia no es idéntica al origen");
 
 /// <summary>
-/// Copia un archivo sin dejarlo a medias: primero a un temporal junto al destino, opcionalmente lo verifica con
-/// SHA-256 y solo entonces reemplaza el destino de una vez. Conserva fechas y atributos del origen.
+/// Copia un archivo sin dejarlo a medias: primero a un temporal junto al destino, calculando el SHA-256 del origen en
+/// esa misma lectura; si se pide, relee el temporal y compara huellas; y solo entonces reemplaza el destino de una vez.
+/// Funciona entre cualquier par de ubicaciones (disco, USB, red, teléfono).
 /// </summary>
 public static class CopiaSegura
 {
     public const string ExtensionTemporal = ".comparador-tmp";
-    private const int TamanoBloque = 4 * 1024 * 1024;
     private const int Reintentos = 3;
     private const int HResultEnUso = unchecked((int)0x80070020);
     private const int HResultBloqueoParcial = unchecked((int)0x80070021);
 
-    public static async Task CopiarAsync(string origen, string destino, bool verificar, ProgresoOperacion progreso, CancellationToken cancelacion)
+    public static async Task CopiarAsync(
+        IUbicacion origen, IUbicacion destino, string relativa, bool verificar,
+        ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         for (var intento = 1; ; intento++)
         {
             try
             {
-                await IntentarCopiarAsync(origen, destino, verificar, progreso, cancelacion);
+                await IntentarCopiarAsync(origen, destino, relativa, verificar, archivo, progreso, cancelacion);
                 return;
             }
-            catch (Exception error) when (EstaEnUso(error, origen, destino) && intento < Reintentos)
+            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa) && intento < Reintentos)
             {
+                archivo.Reiniciar($"En uso, reintento {intento + 1} de {Reintentos}");
                 await Task.Delay(TimeSpan.FromMilliseconds(500 * intento), cancelacion);
             }
-            catch (Exception error) when (EstaEnUso(error, origen, destino))
+            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa))
             {
-                throw new ArchivoEnUsoException(DetectorBloqueos.Describir(origen, destino), error);
+                throw new ArchivoEnUsoException(DetectorBloqueos.Describir(RutaLocal(origen, relativa), RutaLocal(destino, relativa)), error);
             }
         }
     }
@@ -46,96 +49,61 @@ public static class CopiaSegura
     /// Reemplazar un archivo que otro programa tiene abierto NO da "en uso": Windows responde "acceso denegado".
     /// Por eso, ante un acceso denegado se pregunta a Windows si alguien lo tiene abierto antes de culpar a los permisos.
     /// </summary>
-    private static bool EstaEnUso(Exception error, string origen, string destino) => error switch
+    private static bool EstaEnUso(Exception error, IUbicacion origen, IUbicacion destino, string relativa) => error switch
     {
         IOException io => io.HResult is HResultEnUso or HResultBloqueoParcial,
-        UnauthorizedAccessException => DetectorBloqueos.QuienLoUsa(destino).Count > 0 || DetectorBloqueos.QuienLoUsa(origen).Count > 0,
+        UnauthorizedAccessException => DetectorBloqueos.QuienLoUsa(RutaLocal(destino, relativa)).Count > 0
+            || DetectorBloqueos.QuienLoUsa(RutaLocal(origen, relativa)).Count > 0,
         _ => false,
     };
 
-    private static async Task IntentarCopiarAsync(string origen, string destino, bool verificar, ProgresoOperacion progreso, CancellationToken cancelacion)
+    private static string RutaLocal(IUbicacion ubicacion, string relativa) =>
+        ubicacion.Tipo == TipoUbicacion.Telefono ? string.Empty : Path.Combine(ubicacion.Raiz, relativa);
+
+    private static async Task IntentarCopiarAsync(
+        IUbicacion origen, IUbicacion destino, string relativa, bool verificar,
+        ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
-        var origenIO = Rutas.ParaIO(origen);
-        var destinoIO = Rutas.ParaIO(destino);
-        var temporalIO = destinoIO + ExtensionTemporal;
-        Directory.CreateDirectory(Path.GetDirectoryName(destinoIO)!);
+        var temporal = relativa + ExtensionTemporal;
+        destino.CrearCarpeta(Path.GetDirectoryName(relativa) ?? string.Empty);
         try
         {
-            await CopiarContenidoAsync(origenIO, temporalIO, progreso, cancelacion);
-            if (verificar)
+            archivo.Reiniciar("Copiando");
+            string huellaOrigen;
+            await using (var lectura = new FlujoMedido(origen.AbrirLectura(relativa), leidos => progreso.SumarBytes(archivo, leidos)))
             {
-                await VerificarAsync(origenIO, temporalIO, progreso, cancelacion);
+                await destino.EscribirAsync(temporal, lectura, cancelacion);
+                huellaOrigen = lectura.Huella();
             }
 
-            Reemplazar(origenIO, temporalIO, destinoIO);
+            if (verificar)
+            {
+                archivo.Reiniciar("Verificando SHA-256");
+                var huellaCopia = await CalculadoraHash.CalcularAsync(destino, temporal, leidos => progreso.SumarBytes(archivo, leidos), cancelacion);
+                if (huellaCopia != huellaOrigen)
+                {
+                    throw new CopiaNoIdenticaException();
+                }
+            }
+
+            destino.Reemplazar(temporal, relativa, origen.LeerMetadatos(relativa));
         }
         catch
         {
-            BorrarSiExiste(temporalIO);
+            BorrarTemporal(destino, temporal);
             throw;
         }
     }
 
-    private static async Task CopiarContenidoAsync(string origenIO, string temporalIO, ProgresoOperacion progreso, CancellationToken cancelacion)
-    {
-        await using var lectura = CalculadoraHash.AbrirParaLeer(origenIO);
-        await using var escritura = new FileStream(temporalIO, new FileStreamOptions
-        {
-            Mode = FileMode.Create,
-            Access = FileAccess.Write,
-            Share = FileShare.None,
-            BufferSize = 0,
-            Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
-            PreallocationSize = lectura.Length,
-        });
-        var bloque = ArrayPool<byte>.Shared.Rent(TamanoBloque);
-        try
-        {
-            int leidos;
-            while ((leidos = await lectura.ReadAsync(bloque.AsMemory(0, TamanoBloque), cancelacion)) > 0)
-            {
-                await escritura.WriteAsync(bloque.AsMemory(0, leidos), cancelacion);
-                progreso.SumarBytes(leidos);
-            }
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(bloque);
-        }
-    }
-
-    private static async Task VerificarAsync(string origenIO, string temporalIO, ProgresoOperacion progreso, CancellationToken cancelacion)
-    {
-        var huellaOrigen = await CalculadoraHash.CalcularAsync(origenIO, progreso, cancelacion);
-        var huellaCopia = await CalculadoraHash.CalcularAsync(temporalIO, progreso, cancelacion);
-        if (huellaOrigen != huellaCopia)
-        {
-            throw new CopiaNoIdenticaException();
-        }
-    }
-
-    private static void Reemplazar(string origenIO, string temporalIO, string destinoIO)
-    {
-        File.SetCreationTime(temporalIO, File.GetCreationTime(origenIO));
-        File.SetLastWriteTime(temporalIO, File.GetLastWriteTime(origenIO));
-        if (File.Exists(destinoIO))
-        {
-            File.SetAttributes(destinoIO, FileAttributes.Normal);
-        }
-
-        File.Move(temporalIO, destinoIO, overwrite: true);
-        File.SetAttributes(destinoIO, File.GetAttributes(origenIO));
-    }
-
-    private static void BorrarSiExiste(string rutaIO)
+    private static void BorrarTemporal(IUbicacion destino, string temporal)
     {
         try
         {
-            File.Delete(rutaIO);
+            destino.BorrarArchivo(temporal);
         }
-        catch (IOException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
         {
-            // Si no se puede borrar el temporal no es grave: se reintenta en la siguiente copia.
+            // Si no se puede borrar el temporal no es grave: se sobrescribe en la siguiente copia.
         }
     }
 }

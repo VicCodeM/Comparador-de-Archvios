@@ -1,583 +1,71 @@
-<Window x:Class="Comparador.App.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:vm="clr-namespace:Comparador.App.ModelosVista"
-        xmlns:modelos="clr-namespace:Comparador.Nucleo.Modelos;assembly=Comparador.Nucleo"
-        mc:Ignorable="d"
-        Title="Comparador de Archivos - VMSofts"
-        Icon="app.ico"
-        Height="780" Width="1160"
-        MinWidth="920" MinHeight="620"
-        WindowStartupLocation="CenterScreen"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        Background="{DynamicResource MaterialDesignPaper}"
-        FontFamily="{DynamicResource MaterialDesignFont}">
-
+<ui:FluentWindow x:Class="Comparador.App.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:mv="clr-namespace:Comparador.App.ModelosVista"
+                 xmlns:vistas="clr-namespace:Comparador.App.Vistas"
+                 Title="Comparador de Archivos"
+                 Width="1280" Height="820" MinWidth="980" MinHeight="640"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round">
     <Window.DataContext>
-        <vm:PrincipalModeloVista />
+        <mv:PrincipalModeloVista />
     </Window.DataContext>
 
     <Grid>
         <Grid.RowDefinitions>
-            <!-- Cabecera Superior -->
             <RowDefinition Height="Auto" />
-            <!-- Contenido Principal -->
             <RowDefinition Height="*" />
-            <!-- Avisos flotantes -->
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- CABECERA SUPERIOR -->
-        <materialDesign:ColorZone Mode="PrimaryMid" Padding="16,10" Grid.Row="0" materialDesign:ElevationAssist.Elevation="Dp4">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+        <ui:TitleBar Title="Comparador de Archivos">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/app.ico" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
 
-                <!-- Título y Marca VMSofts -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="FolderSync" Width="28" Height="28" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <StackPanel>
-                        <TextBlock Text="Comparador de Archivos" FontWeight="Bold" FontSize="18" />
-                        <TextBlock Text="VMSofts · Comparación y Sincronización Segura" FontSize="11" Opacity="0.85" />
-                    </StackPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Menú lateral: los pasos se pueden pulsar en cuanto hay algo que ver en ellos -->
+            <DockPanel Margin="8,4,8,12">
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Separator Margin="4,8" />
+                    <ContentControl Content="{Binding MenuInferior}" ContentTemplate="{StaticResource PlantillaMenu}" />
+                    <TextBlock Text="Creado por Ing. Victor Maldonado - VMSofts" Margin="12,12,12,0"
+                               Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" />
                 </StackPanel>
+                <ItemsControl ItemsSource="{Binding Menu}" ItemTemplate="{StaticResource PlantillaMenu}" Focusable="False" />
+            </DockPanel>
 
-                <!-- Indicador de Flujo en 4 Pasos -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- Paso 1: Configurar -->
-                    <Border CornerRadius="14" Padding="12,5" Margin="4,0"
-                            Background="{DynamicResource PrimaryHueDarkBrush}">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FolderCogOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="1. Carpetas" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                    <materialDesign:PackIcon Kind="ChevronRight" Opacity="0.6" VerticalAlignment="Center" Margin="2,0" />
+            <!-- Área de contenido, con la esquina redondeada y la capa de PowerToys -->
+            <Border Grid.Column="1"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1,1,0,0"
+                    CornerRadius="8,0,0,0">
+                <Grid>
+                    <vistas:VistaUbicaciones Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Ubicaciones}" />
+                    <vistas:VistaComparacion Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Comparacion}" />
+                    <vistas:VistaCopia Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Copia}" />
+                    <vistas:VistaConfiguracion Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Configuracion}" />
 
-                    <!-- Paso 2: Comparar -->
-                    <Border CornerRadius="14" Padding="12,5" Margin="4,0">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Compare" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="2. Comparar" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                    <materialDesign:PackIcon Kind="ChevronRight" Opacity="0.6" VerticalAlignment="Center" Margin="2,0" />
-
-                    <!-- Paso 3: Revisión -->
-                    <Border CornerRadius="14" Padding="12,5" Margin="4,0">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FormatListChecks" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="3. Revisión" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                    <materialDesign:PackIcon Kind="ChevronRight" Opacity="0.6" VerticalAlignment="Center" Margin="2,0" />
-
-                    <!-- Paso 4: Sincronizar -->
-                    <Border CornerRadius="14" Padding="12,5" Margin="4,0">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Sync" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="4. Sincronizar" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- Alternar Tema Claro / Oscuro -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource MaterialDesignIconButton}"
-                            ToolTip="Alternar tema claro / oscuro"
-                            Command="{Binding AlternarTemaCommand}"
-                            Foreground="White">
-                        <materialDesign:PackIcon Kind="{Binding IconoTema}" Width="22" Height="22" />
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </materialDesign:ColorZone>
-
-        <!-- CONTENIDO PRINCIPAL -->
-        <Grid Grid.Row="1" Margin="20">
-
-            <!-- ========================================== -->
-            <!-- PASO 1: CONFIGURACIÓN DE CARPETAS Y MODO  -->
-            <!-- ========================================== -->
-            <Grid Visibility="{Binding EsPasoConfiguracion, Converter={StaticResource BoolToVis}}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel MaxWidth="1000" HorizontalAlignment="Stretch">
-
-                        <!-- Tarjeta de Selección de Rutas -->
-                        <materialDesign:Card Padding="20" Margin="0,0,0,16" materialDesign:ElevationAssist.Elevation="Dp2">
-                            <StackPanel>
-                                <TextBlock Text="Carpetas a Comparar" Style="{StaticResource MaterialDesignHeadline6TextBlock}" />
-                                <TextBlock Text="Seleccione las carpetas o arrástrelas directamente desde el Explorador de Windows." Opacity="0.7" Margin="0,4,0,16" />
-
-                                <!-- Fila Origen -->
-                                <Grid AllowDrop="True" Drop="Origen_Drop" DragOver="Ruta_DragOver" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="FolderUploadOutline" Width="26" Height="26" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryHueMidBrush}" />
-                                    <TextBox Grid.Column="1" Text="{Binding RutaOrigen, UpdateSourceTrigger=PropertyChanged}"
-                                             materialDesign:HintAssist.Hint="Carpeta de Origen (arrastre aquí o examine)"
-                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                             VerticalAlignment="Center" />
-                                    <Button Grid.Column="2" Style="{StaticResource MaterialDesignOutlinedButton}"
-                                            Margin="8,0,0,0" Command="{Binding ExaminarOrigenCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="FolderOpenOutline" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Examinar..." VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-
-                                <!-- Botón Intercambiar -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
-                                    <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                            Command="{Binding IntercambiarRutasCommand}"
-                                            ToolTip="Intercambiar origen y destino" Padding="14,4">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="SwapVertical" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Invertir dirección" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Button>
-                                </StackPanel>
-
-                                <!-- Fila Destino -->
-                                <Grid AllowDrop="True" Drop="Destino_Drop" DragOver="Ruta_DragOver" Margin="0,0,0,14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="FolderDownloadOutline" Width="26" Height="26" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryHueMidBrush}" />
-                                    <TextBox Grid.Column="1" Text="{Binding RutaDestino, UpdateSourceTrigger=PropertyChanged}"
-                                             materialDesign:HintAssist.Hint="Carpeta de Destino (arrastre aquí o examine)"
-                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                             VerticalAlignment="Center" />
-                                    <Button Grid.Column="2" Style="{StaticResource MaterialDesignOutlinedButton}"
-                                            Margin="8,0,0,0" Command="{Binding ExaminarDestinoCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="FolderOpenOutline" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Examinar..." VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-
-                                <!-- Pares Recientes (si existen) -->
-                                <StackPanel Visibility="{Binding Recientes.Count, Converter={StaticResource BoolToVis}}" Margin="0,6,0,0">
-                                    <TextBlock Text="Pares recientes:" FontWeight="SemiBold" FontSize="12" Opacity="0.8" Margin="0,0,0,6" />
-                                    <ItemsControl ItemsSource="{Binding Recientes}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                                        Margin="0,0,8,8" Height="28" Padding="8,2"
-                                                        Command="{Binding DataContext.UsarRecienteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                        CommandParameter="{Binding}">
-                                                    <TextBlock Text="{Binding Origen, StringFormat='{}{0} ➔ ...'}" FontSize="11" />
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </StackPanel>
-                        </materialDesign:Card>
-
-                        <!-- Tarjeta de Opciones de Comparación -->
-                        <materialDesign:Card Padding="20" Margin="0,0,0,16" materialDesign:ElevationAssist.Elevation="Dp2">
-                            <StackPanel>
-                                <TextBlock Text="Opciones de Comparación" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="0,0,0,16" />
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Columna Izquierda: Modos -->
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Modo de comprobación:" FontWeight="SemiBold" Margin="0,0,0,8" />
-                                        <RadioButton Content="Rápido (tamaño y fecha de modificación con 2s tolerancia)"
-                                                     IsChecked="{Binding ModoRapido}" Margin="0,0,0,6" />
-                                        <RadioButton Content="Exacto (compara el contenido SHA-256 en paralelo)"
-                                                     IsChecked="{Binding ModoExacto}" Margin="0,0,0,12" />
-
-                                        <Separator Margin="0,4,0,12" />
-
-                                        <CheckBox Content="Verificar cada archivo con SHA-256 al sincronizar (Copia Segura)"
-                                                  IsChecked="{Binding VerificarCopias}" Margin="0,0,0,6" />
-                                    </StackPanel>
-
-                                    <!-- Columna Derecha: Sobrantes y Exclusiones -->
-                                    <StackPanel Grid.Column="1" Margin="24,0,0,0">
-                                        <CheckBox Content="Detectar sobrantes (archivos que solo existen en destino)"
-                                                  IsChecked="{Binding DetectarSobrantes}" Margin="0,0,0,14" />
-
-                                        <TextBox Text="{Binding Exclusiones, UpdateSourceTrigger=PropertyChanged}"
-                                                 materialDesign:HintAssist.Hint="Exclusiones (separadas por punto y coma)"
-                                                 materialDesign:HintAssist.HelperText="Ej: node_modules; *.tmp; .git; bin; obj"
-                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </materialDesign:Card>
-
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- Barra Inferior de Acción -->
-                <materialDesign:ColorZone Grid.Row="1" Mode="Standard" Padding="0,16,0,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                                Height="48" Padding="28,0"
-                                Command="{Binding IniciarComparacionCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Compare" Width="22" Height="22" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                <TextBlock Text="INICIAR COMPARACIÓN" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </materialDesign:ColorZone>
-            </Grid>
-
-            <!-- ========================================== -->
-            <!-- PASO 2 / 4: PROGRESO (COMPARANDO O COPIANDO) -->
-            <!-- ========================================== -->
-            <Grid Visibility="{Binding EnOperacion, Converter={StaticResource BoolToVis}}">
-                <materialDesign:Card Width="680" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                     Padding="32" materialDesign:ElevationAssist.Elevation="Dp6">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
-                            <materialDesign:PackIcon Kind="Sync" Width="36" Height="36" Margin="0,0,12,0"
-                                                     VerticalAlignment="Center" Foreground="{DynamicResource PrimaryHueMidBrush}" />
-                            <TextBlock Text="{Binding Progreso.Fase}" Style="{StaticResource MaterialDesignHeadline5TextBlock}" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Barra de Progreso -->
-                        <ProgressBar Value="{Binding Progreso.Porcentaje}"
-                                     IsIndeterminate="{Binding Progreso.Indeterminado}"
-                                     Height="12" Margin="0,0,0,12" materialDesign:TransitionAssist.DisableTransitions="True" />
-
-                        <!-- Detalles numéricos -->
-                        <Grid Margin="0,0,0,8">
-                            <TextBlock Text="{Binding Progreso.Detalle}" FontWeight="SemiBold" HorizontalAlignment="Left" />
-                            <TextBlock Text="{Binding Progreso.Porcentaje, StringFormat='{}{0:F1}%'}" FontWeight="Bold"
-                                       HorizontalAlignment="Right" Visibility="{Binding Progreso.Indeterminado, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}" />
-                        </Grid>
-
-                        <!-- Velocidad y Tiempo Restante -->
-                        <Grid Margin="0,0,0,14">
-                            <TextBlock Text="{Binding Progreso.Velocidad}" HorizontalAlignment="Left" Opacity="0.8" />
-                            <TextBlock Text="{Binding Progreso.Restante}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryHueMidBrush}" />
-                        </Grid>
-
-                        <!-- Archivo o carpeta actual -->
-                        <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="4" Padding="10,6" Margin="0,0,0,16">
-                            <TextBlock Text="{Binding Progreso.Actual, StringFormat='Actual: {0}'}" TextTrimming="CharacterEllipsis" Opacity="0.75" FontSize="12" />
-                        </Border>
-
-                        <!-- Botón Cancelar -->
-                        <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                HorizontalAlignment="Center"
-                                Command="{Binding CancelarOperacionCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="CloseCircleOutline" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Cancelar Operación" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </materialDesign:Card>
-            </Grid>
-
-            <!-- ========================================== -->
-            <!-- PASO 3: REVISIÓN DE RESULTADOS (TABLA)    -->
-            <!-- ========================================== -->
-            <Grid Visibility="{Binding EsPasoRevision, Converter={StaticResource BoolToVis}}">
-                <Grid.RowDefinitions>
-                    <!-- Filtros y Búsqueda -->
-                    <RowDefinition Height="Auto" />
-                    <!-- Tabla Virtualizada -->
-                    <RowDefinition Height="*" />
-                    <!-- Resumen y Acción de Sincronizar -->
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- Barra de Filtros y Búsqueda -->
-                <materialDesign:Card Grid.Row="0" Padding="12" Margin="0,0,0,12" materialDesign:ElevationAssist.Elevation="Dp1">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Chips de Filtros -->
-                        <WrapPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
-                            <RadioButton Content="{Binding Revision.Pendientes, StringFormat='Pendientes ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Pendientes', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Pendientes}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Faltan, StringFormat='Faltan ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Faltan', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Faltan}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Diferentes, StringFormat='Diferentes ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Diferentes', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Diferentes}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Sobran, StringFormat='Sobran ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Sobran', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Sobran}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Problemas, StringFormat='Problemas ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Problemas', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Problemas}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Iguales, StringFormat='Iguales ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Iguales', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Iguales}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                            <RadioButton Content="{Binding Revision.Todos.Count, StringFormat='Todos ({0})'}"
-                                         GroupName="FiltrosRevision" Margin="0,0,8,4"
-                                         IsChecked="{Binding Revision.Filtro, Converter={StaticResource FiltroEsIgual}, ConverterParameter='Todos', Mode=OneWay}"
-                                         Command="{Binding Revision.FijarFiltroCommand}" CommandParameter="{x:Static vm:FiltroRevision.Todos}"
-                                         Style="{StaticResource MaterialDesignTabRadioButton}" />
-                        </WrapPanel>
-
-                        <!-- Duración -->
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Revision.Duracion, StringFormat='Comparado en {0}'}"
-                                   VerticalAlignment="Center" FontWeight="SemiBold" Opacity="0.8" />
-
-                        <!-- Fila 2: Búsqueda y Botones de Selección -->
-                        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="320" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <TextBox Grid.Column="0" Text="{Binding Revision.Busqueda, UpdateSourceTrigger=PropertyChanged}"
-                                     materialDesign:HintAssist.Hint="Buscar archivo o carpeta..."
-                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                     materialDesign:TextFieldAssist.HasClearButton="True" />
-
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        Content="Seleccionar Visibles" Margin="0,0,8,0"
-                                        Command="{Binding Revision.SeleccionarVisiblesCommand}" />
-                                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        Content="Deseleccionar" Margin="0,0,8,0"
-                                        Command="{Binding Revision.QuitarSeleccionVisiblesCommand}" />
-                                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        ToolTip="Guardar listado en hoja de cálculo CSV"
-                                        Command="{Binding Revision.ExportarCommand}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FileExportOutline" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="Exportar CSV" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-                </materialDesign:Card>
-
-                <!-- TABLA VIRTUALIZADA DE ARCHIVOS -->
-                <DataGrid Grid.Row="1"
-                          ItemsSource="{Binding Revision.Visibles}"
-                          AutoGenerateColumns="False"
-                          CanUserAddRows="False"
-                          CanUserDeleteRows="False"
-                          IsReadOnly="True"
-                          SelectionMode="Single"
-                          VirtualizingPanel.IsVirtualizing="True"
-                          VirtualizingPanel.VirtualizationMode="Recycling"
-                          EnableRowVirtualization="True"
-                          ScrollViewer.IsDeferredScrollingEnabled="True"
-                          materialDesign:DataGridAssist.CellPadding="10,6"
-                          BorderThickness="1"
-                          BorderBrush="{DynamicResource MaterialDesignDivider}">
-
-                    <DataGrid.Columns>
-                        <!-- Selección -->
-                        <DataGridTemplateColumn Width="45">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate DataType="{x:Type modelos:ElementoComparado}">
-                                    <CheckBox IsChecked="{Binding Seleccionado, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEnabled="{Binding SePuedeSincronizar}"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-
-                        <!-- Estado (Icono + Texto) -->
-                        <DataGridTemplateColumn Header="Estado" Width="130">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate DataType="{x:Type modelos:ElementoComparado}">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialDesign:PackIcon Kind="{Binding Estado, Converter={StaticResource EstadoAIcono}}"
-                                                                 Foreground="{Binding Estado, Converter={StaticResource EstadoABrush}}"
-                                                                 Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding Estado}" FontWeight="SemiBold"
-                                                   Foreground="{Binding Estado, Converter={StaticResource EstadoABrush}}"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-
-                        <!-- Ruta Relativa / Nombre -->
-                        <DataGridTemplateColumn Header="Nombre y Ruta Relativa" Width="2*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate DataType="{x:Type modelos:ElementoComparado}">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialDesign:PackIcon Kind="{Binding EsCarpeta, Converter={StaticResource BoolToVis}}"
-                                                                 Width="16" Height="16" Margin="0,0,6,0" Opacity="0.7" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding RutaRelativa}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-
-                        <!-- Motivo técnico -->
-                        <DataGridTextColumn Header="Motivo" Binding="{Binding Motivo}" Width="2*" />
-
-                        <!-- Tamaño Origen -->
-                        <DataGridTextColumn Header="Tam. Origen" Binding="{Binding TamanoOrigen, Converter={StaticResource TamanoFormato}}" Width="100" />
-
-                        <!-- Tamaño Destino -->
-                        <DataGridTextColumn Header="Tam. Destino" Binding="{Binding TamanoDestino, Converter={StaticResource TamanoFormato}}" Width="100" />
-
-                        <!-- Fecha Origen -->
-                        <DataGridTextColumn Header="Fecha Origen" Binding="{Binding FechaOrigen, Converter={StaticResource FechaFormato}}" Width="140" />
-
-                        <!-- Fecha Destino -->
-                        <DataGridTextColumn Header="Fecha Destino" Binding="{Binding FechaDestino, Converter={StaticResource FechaFormato}}" Width="140" />
-
-                        <!-- Acciones -->
-                        <DataGridTemplateColumn Header="Opciones" Width="80">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate DataType="{x:Type modelos:ElementoComparado}">
-                                    <materialDesign:PopupBox Style="{StaticResource MaterialDesignPopupBox}" PlacementMode="BottomAndAlignRightEdges">
-                                        <StackPanel Width="210">
-                                            <Button Command="{Binding DataContext.Revision.AbrirOrigenCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Content="Abrir archivo" />
-                                            <Button Command="{Binding DataContext.Revision.MostrarOrigenCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Content="Mostrar en origen" />
-                                            <Button Command="{Binding DataContext.Revision.MostrarDestinoCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Content="Mostrar en destino" />
-                                            <Separator />
-                                            <Button Command="{Binding DataContext.Revision.CopiarRutaCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Content="Copiar ruta" />
-                                            <Button Command="{Binding DataContext.Revision.QuienLoUsaCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Content="¿Quién lo tiene abierto?" />
-                                        </StackPanel>
-                                    </materialDesign:PopupBox>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-
-                <!-- Barra Inferior de Acción y Selección -->
-                <materialDesign:Card Grid.Row="2" Padding="16,12" Margin="0,12,0,0" materialDesign:ElevationAssist.Elevation="Dp2">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Resumen de seleccionados -->
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <materialDesign:PackIcon Kind="InformationOutline" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryHueMidBrush}" />
-                            <TextBlock Text="{Binding Revision.ResumenSeleccion}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Botones de Acción -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    Command="{Binding VolverAConfiguracionCommand}" Content="VOLVER A CONFIGURAR" Margin="0,0,10,0" />
-
-                            <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                                    Height="42" Padding="20,0"
-                                    Command="{Binding IniciarSincronizacionCommand}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="SINCRONIZAR SELECCIONADOS" FontWeight="Bold" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                </materialDesign:Card>
-            </Grid>
-
-            <!-- ========================================== -->
-            <!-- PASO 4: RESUMEN TRAS SINCRONIZAR          -->
-            <!-- ========================================== -->
-            <Grid Visibility="{Binding EsPasoResumen, Converter={StaticResource BoolToVis}}">
-                <materialDesign:Card Width="600" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                     Padding="36" materialDesign:ElevationAssist.Elevation="Dp4">
-                    <StackPanel HorizontalAlignment="Center">
-                        <materialDesign:PackIcon Kind="CheckCircleOutline" Width="64" Height="64"
-                                                 Foreground="#2E7D32" HorizontalAlignment="Center" Margin="0,0,0,14" />
-
-                        <TextBlock Text="¡Sincronización Finalizada!"
-                                   Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                                   HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,16" />
-
-                        <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="8" Padding="20" Margin="0,0,0,20">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="Archivos sincronizados:" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding ResumenCopiados, StringFormat='{}{0:N0}'}" HorizontalAlignment="Right" FontWeight="Bold" />
-                                </Grid>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="Archivos con fallos:" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding ResumenFallidos, StringFormat='{}{0:N0}'}" HorizontalAlignment="Right" FontWeight="Bold" />
-                                </Grid>
-                                <Grid>
-                                    <TextBlock Text="Tiempo total:" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding ResumenTiempo}" HorizontalAlignment="Right" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    Command="{Binding VolverARevisionCommand}" Content="Ver Resultados" Margin="0,0,12,0" />
-                            <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                                    Command="{Binding VolverAConfiguracionCommand}" Content="Nueva Comparación" />
-                        </StackPanel>
-                    </StackPanel>
-                </materialDesign:Card>
-            </Grid>
-
+                    <ui:InfoBar DataContext="{Binding Avisos}"
+                                VerticalAlignment="Bottom" Margin="32,0,32,20" MaxWidth="900"
+                                Title="{Binding Mensaje}"
+                                Severity="{Binding Severidad}"
+                                IsOpen="{Binding Visible, Mode=TwoWay}"
+                                IsClosable="True">
+                        <ui:Button Content="{Binding TextoAccion}" Command="{Binding EjecutarCommand}"
+                                   Visibility="{Binding TieneAccion, Converter={StaticResource BoolAVisible}}" />
+                    </ui:InfoBar>
+                </Grid>
+            </Border>
         </Grid>
-
-        <!-- SNACKBAR FLOTANTE DE NOTIFICACIONES -->
-        <materialDesign:Snackbar Grid.Row="2" MessageQueue="{Binding Avisos}" />
     </Grid>
-</Window>
+</ui:FluentWindow>

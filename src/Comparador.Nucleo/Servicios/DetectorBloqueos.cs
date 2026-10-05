@@ -15,6 +15,11 @@ public static class DetectorBloqueos
 
     public static IReadOnlyList<string> QuienLoUsa(string ruta)
     {
+        if (string.IsNullOrEmpty(ruta))
+        {
+            return [];
+        }
+
         var clave = new StringBuilder(MaximoClave + 1);
         if (RmStartSession(out var sesion, 0, clave) != 0)
         {

@@ -21,4 +21,7 @@ public sealed record OpcionesComparacion
 
     /// <summary>Nombres o comodines a ignorar, por ejemplo "node_modules", ".git", "*.tmp".</summary>
     public IReadOnlyList<string> Exclusiones { get; init; } = [];
+
+    /// <summary>Lecturas simultáneas al comparar contenido; null = según los dispositivos (ver <c>Concurrencia</c>).</summary>
+    public int? HilosManuales { get; init; }
 }

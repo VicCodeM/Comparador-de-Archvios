@@ -1,0 +1,57 @@
+<UserControl x:Class="Comparador.App.Vistas.VistaCopia"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vistas="clr-namespace:Comparador.App.Vistas"
+             xmlns:mv="clr-namespace:Comparador.App.ModelosVista">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,28,40,24" MaxWidth="1000">
+                <TextBlock Text="Copiando" Style="{StaticResource TituloPagina}"
+                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
+                <TextBlock Text="Copia terminada" Style="{StaticResource TituloPagina}"
+                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+
+                <vistas:PanelProgreso DataContext="{Binding Progreso}" Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolAVisible}}" />
+
+                <ui:InfoBar Title="{Binding ResumenCopia}" Severity="{Binding SeveridadCopia}" IsOpen="True" IsClosable="False" Margin="0,0,0,4"
+                            Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
+                </ui:InfoBar>
+
+                <!-- Lo que falló, con su motivo: todos, para poder revisarlos -->
+                <TextBlock Style="{StaticResource TituloSeccion}" Visibility="{Binding Progreso.Fallidos, Converter={StaticResource HayAlgoAVisible}}">
+                    <Run Text="No se pudieron copiar" /><Run Text="{Binding Progreso.Fallidos, Mode=OneWay, StringFormat=' ({0:N0})'}" />
+                </TextBlock>
+                <Border Style="{StaticResource Tarjeta}" Padding="20,8" Visibility="{Binding Progreso.Fallidos, Converter={StaticResource HayAlgoAVisible}}">
+                    <ui:ListView ItemsSource="{Binding Progreso.Errores}" ItemTemplate="{StaticResource PlantillaTerminado}" MaxHeight="300"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" Background="Transparent" BorderThickness="0" />
+                </Border>
+
+                <TextBlock Style="{StaticResource TituloSeccion}" Visibility="{Binding Progreso.Recientes.Count, Converter={StaticResource HayAlgoAVisible}}">
+                    <Run Text="Terminados" /><Run Text="{Binding Progreso.Correctos, Mode=OneWay, StringFormat=' · {0:N0} correctos'}" />
+                </TextBlock>
+                <Border Style="{StaticResource Tarjeta}" Padding="20,8" Visibility="{Binding Progreso.Recientes.Count, Converter={StaticResource HayAlgoAVisible}}">
+                    <ui:ListView ItemsSource="{Binding Progreso.Recientes}" ItemTemplate="{StaticResource PlantillaTerminado}" MaxHeight="420"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" Background="Transparent" BorderThickness="0" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
+            <Grid MaxWidth="1000">
+                <ui:Button HorizontalAlignment="Right" Content="Cancelar" Command="{Binding CancelarCommand}" Icon="{ui:SymbolIcon Stop24}"
+                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
+                    <ui:Button Content="Volver a la comparación" Command="{Binding IrACommand}" CommandParameter="{x:Static mv:Pagina.Comparacion}" Margin="0,0,8,0" />
+                    <ui:Button Content="Nueva comparación" Appearance="Primary" Command="{Binding IrACommand}" CommandParameter="{x:Static mv:Pagina.Ubicaciones}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,4 +1,5 @@
 using Comparador.Nucleo.Modelos;
+using Comparador.Nucleo.Ubicaciones;
 
 namespace Comparador.Nucleo.Servicios;
 
@@ -7,7 +8,7 @@ public sealed record EntradaEscaneada(
     string RutaRelativa, bool EsCarpeta, long Tamano, DateTime FechaModificacion, bool SinAcceso = false, bool EsEnlace = false);
 
 /// <summary>
-/// Recorre una carpeta entera contando en vivo lo que encuentra. Las carpetas sin permiso se anotan como
+/// Recorre una ubicación entera contando en vivo lo que encuentra. Las carpetas sin permiso se anotan como
 /// "sin acceso" y se sigue: NO se les cambia el dueño ni los permisos (la versión anterior lo hacía sola).
 /// Los enlaces (junctions) no se recorren por dentro, para no entrar en bucles.
 /// </summary>
@@ -15,15 +16,7 @@ public static class EscanerCarpetas
 {
     private const int CadaCuantosMarcar = 250;
 
-    private static readonly EnumerationOptions SoloEsteNivel = new()
-    {
-        RecurseSubdirectories = false,
-        IgnoreInaccessible = false,
-        AttributesToSkip = 0,
-        ReturnSpecialDirectories = false,
-    };
-
-    public static List<EntradaEscaneada> Escanear(string raiz, FiltroExclusiones filtro, ProgresoOperacion progreso, CancellationToken cancelacion)
+    public static List<EntradaEscaneada> Escanear(IUbicacion ubicacion, FiltroExclusiones filtro, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         var encontradas = new List<EntradaEscaneada>();
         var pendientes = new Stack<string>();
@@ -32,7 +25,7 @@ public static class EscanerCarpetas
         {
             cancelacion.ThrowIfCancellationRequested();
             var carpeta = pendientes.Pop();
-            foreach (var entrada in LeerCarpeta(raiz, carpeta, filtro))
+            foreach (var entrada in LeerCarpeta(ubicacion, carpeta, filtro))
             {
                 encontradas.Add(entrada);
                 ContarEncontrada(entrada, encontradas.Count, progreso);
@@ -46,15 +39,11 @@ public static class EscanerCarpetas
         return encontradas;
     }
 
-    private static IEnumerable<EntradaEscaneada> LeerCarpeta(string raiz, string carpeta, FiltroExclusiones filtro)
+    private static IEnumerable<EntradaEscaneada> LeerCarpeta(IUbicacion ubicacion, string carpeta, FiltroExclusiones filtro)
     {
         try
         {
-            return new DirectoryInfo(Rutas.ParaIO(Path.Combine(raiz, carpeta)))
-                .EnumerateFileSystemInfos("*", SoloEsteNivel)
-                .Where(info => !filtro.Excluye(info.Name))
-                .Select(info => Describir(carpeta, info))
-                .ToList();
+            return ubicacion.ListarCarpeta(carpeta).Where(entrada => !EsTemporalDeCopia(entrada) && !filtro.Excluye(Path.GetFileName(entrada.RutaRelativa)));
         }
         catch (UnauthorizedAccessException) when (carpeta.Length > 0)
         {
@@ -66,14 +55,9 @@ public static class EscanerCarpetas
         }
     }
 
-    private static EntradaEscaneada Describir(string carpeta, FileSystemInfo info)
-    {
-        var ruta = Path.Combine(carpeta, info.Name);
-
-        return info is FileInfo archivo
-            ? new EntradaEscaneada(ruta, EsCarpeta: false, archivo.Length, archivo.LastWriteTime)
-            : new EntradaEscaneada(ruta, EsCarpeta: true, 0, info.LastWriteTime, EsEnlace: info.Attributes.HasFlag(FileAttributes.ReparsePoint));
-    }
+    /// <summary>Lo que dejó una copia interrumpida (por ejemplo, un apagón) no es un archivo del usuario.</summary>
+    private static bool EsTemporalDeCopia(EntradaEscaneada entrada) =>
+        !entrada.EsCarpeta && entrada.RutaRelativa.EndsWith(CopiaSegura.ExtensionTemporal, StringComparison.OrdinalIgnoreCase);
 
     private static void ContarEncontrada(EntradaEscaneada entrada, int cuantas, ProgresoOperacion progreso)
     {

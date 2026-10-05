@@ -1,0 +1,111 @@
+<UserControl x:Class="Comparador.App.Vistas.VistaUbicaciones"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vistas="clr-namespace:Comparador.App.Vistas">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,28,40,24" MaxWidth="1000">
+                <TextBlock Text="Ubicaciones" Style="{StaticResource TituloPagina}" />
+
+                <vistas:SelectorUbicacion DataContext="{Binding Origen}" />
+                <ui:Button HorizontalAlignment="Center" Margin="0,6" Appearance="Transparent"
+                           Command="{Binding IntercambiarRutasCommand}" ToolTip="Intercambiar origen y destino">
+                    <ui:SymbolIcon Symbol="ArrowSortDown24" FontSize="18" />
+                </ui:Button>
+                <vistas:SelectorUbicacion DataContext="{Binding Destino}" />
+
+                <!-- Varios pares en una sola pasada -->
+                <ItemsControl ItemsSource="{Binding ParesExtra}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Tarjeta}" Padding="16,10" Margin="0,4,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:SymbolIcon Symbol="FolderSwap24" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Origen}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource TextoSecundario}" Text="{Binding Destino, StringFormat='hacia  {0}'}" />
+                                    </StackPanel>
+                                    <ui:Button Grid.Column="2" Appearance="Transparent" ToolTip="Quitar de la lista"
+                                               Command="{Binding DataContext.QuitarParCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}">
+                                        <ui:SymbolIcon Symbol="Dismiss24" />
+                                    </ui:Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ui:HyperlinkButton Content="Agregar este par y elegir otro (para comparar varias carpetas de una vez)"
+                                    Command="{Binding AgregarParCommand}" Margin="0,4,0,0" Padding="4" />
+
+                <TextBlock Text="Cómo comparar" Style="{StaticResource TituloSeccion}" />
+                <ui:CardControl Icon="{ui:SymbolIcon DocumentSearch24}" Margin="0,0,0,4">
+                    <ui:CardControl.Header>
+                        <StackPanel>
+                            <TextBlock Text="Comparar también el contenido (SHA-256)" FontSize="14" />
+                            <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap"
+                                       Text="Más lento: lee cada archivo de igual tamaño. Detecta los que tienen el mismo tamaño y fecha pero distinto contenido. Recomendado con teléfonos, que no guardan la fecha." />
+                        </StackPanel>
+                    </ui:CardControl.Header>
+                    <ui:ToggleSwitch IsChecked="{Binding ModoExacto}" />
+                </ui:CardControl>
+                <ui:CardControl Icon="{ui:SymbolIcon SubtractCircle24}" Margin="0,0,0,4">
+                    <ui:CardControl.Header>
+                        <StackPanel>
+                            <TextBlock Text="Mostrar lo que solo está en el destino" FontSize="14" />
+                            <TextBlock Style="{StaticResource TextoSecundario}" Text="Solo se muestra: nunca se borra nada del destino." />
+                        </StackPanel>
+                    </ui:CardControl.Header>
+                    <ui:ToggleSwitch IsChecked="{Binding DetectarSobrantes}" />
+                </ui:CardControl>
+                <ui:CardControl Icon="{ui:SymbolIcon Dismiss24}">
+                    <ui:CardControl.Header>
+                        <StackPanel>
+                            <TextBlock Text="Ignorar" FontSize="14" />
+                            <TextBlock Style="{StaticResource TextoSecundario}" Text="Nombres o comodines separados por ; (por ejemplo node_modules; .git; *.tmp)" />
+                        </StackPanel>
+                    </ui:CardControl.Header>
+                    <ui:TextBox Text="{Binding Exclusiones, UpdateSourceTrigger=PropertyChanged}" Width="300" PlaceholderText="Nada" />
+                </ui:CardControl>
+
+                <TextBlock Text="Recientes" Style="{StaticResource TituloSeccion}"
+                           Visibility="{Binding Recientes.Count, Converter={StaticResource HayAlgoAVisible}}" />
+                <ItemsControl ItemsSource="{Binding Recientes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ui:CardAction Margin="0,0,0,4" Padding="16,10" Icon="{ui:SymbolIcon History24}"
+                                           Command="{Binding DataContext.UsarRecienteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Origen}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Style="{StaticResource TextoSecundario}" Text="{Binding Destino, StringFormat='hacia  {0}'}" />
+                                </StackPanel>
+                            </ui:CardAction>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Barra de acción fija abajo -->
+        <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
+            <Grid MaxWidth="1000">
+                <TextBlock VerticalAlignment="Center" Style="{StaticResource TextoSecundario}"
+                           Text="Comparar no cambia nada: primero verás qué falta y qué es distinto, y tú decides qué copiar." />
+                <ui:Button HorizontalAlignment="Right" Appearance="Primary" Padding="22,8"
+                           Command="{Binding IniciarComparacionCommand}" Icon="{ui:SymbolIcon BranchCompare24}" Content="Comparar" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

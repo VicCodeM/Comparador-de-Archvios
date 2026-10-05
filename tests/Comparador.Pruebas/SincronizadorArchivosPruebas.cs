@@ -13,7 +13,7 @@ public sealed class SincronizadorArchivosPruebas : IDisposable
     {
         var resultado = await new ComparadorCarpetas().CompararAsync(
             [new ParRutas(carpetas.Origen, carpetas.Destino)], new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
-        var resumen = await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar, new ProgresoOperacion(), CancellationToken.None);
+        var resumen = await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar, hilosManuales: null, new ProgresoOperacion(), CancellationToken.None);
 
         return (resultado, resumen);
     }
@@ -45,7 +45,7 @@ public sealed class SincronizadorArchivosPruebas : IDisposable
             [new ParRutas(carpetas.Origen, carpetas.Destino)], new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
         resultado.Elementos.Single(e => e.RutaRelativa == "b.txt").Seleccionado = false;
 
-        await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar: false, new ProgresoOperacion(), CancellationToken.None);
+        await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar: false, hilosManuales: null, new ProgresoOperacion(), CancellationToken.None);
 
         Assert.True(File.Exists(Path.Combine(carpetas.Destino, "a.txt")));
         Assert.False(File.Exists(Path.Combine(carpetas.Destino, "b.txt")));

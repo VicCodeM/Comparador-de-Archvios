@@ -1,197 +1,269 @@
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Windows;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Comparador.App.Servicios;
 using Comparador.Nucleo.Modelos;
 using Comparador.Nucleo.Servicios;
-using MaterialDesignThemes.Wpf;
+using Wpf.Ui.Controls;
 
 namespace Comparador.App.ModelosVista;
 
-public enum PasoApp
+public enum Pagina
 {
-    Configuracion = 1,
-    Comparando = 2,
-    Revision = 3,
-    Sincronizando = 4,
-    Resumen = 5,
+    Ubicaciones,
+    Comparacion,
+    Copia,
+    Configuracion,
+}
+
+public enum Operacion
+{
+    Ninguna,
+    Comparando,
+    Copiando,
+}
+
+/// <summary>Una entrada del menú lateral. Se puede pulsar si ya hay algo que ver en esa página.</summary>
+public sealed partial class EntradaMenu(Pagina pagina, string titulo, SymbolRegular icono) : ObservableObject
+{
+    [ObservableProperty] private bool esActual;
+    [ObservableProperty] private bool disponible;
+    [ObservableProperty] private string estado = string.Empty;
+
+    public Pagina Pagina { get; } = pagina;
+
+    public string Titulo { get; } = titulo;
+
+    public SymbolRegular Icono { get; } = icono;
 }
 
 /// <summary>
-/// Modelo de vista principal que orquesta el flujo en 4 pasos de la aplicación,
-/// la configuración persistente, el cambio de temas y las operaciones asíncronas.
+/// Orquesta la app: qué página se ve, qué operación corre y la configuración. Navegar NUNCA cancela una operación:
+/// se puede volver a Ubicaciones o a Configuración mientras se copia, y regresar a ver el avance.
 /// </summary>
 public sealed partial class PrincipalModeloVista : ObservableObject
 {
-    private readonly PaletteHelper paleta = new();
-    private CancellationTokenSource? cts;
+    private CancellationTokenSource? cancelacion;
     private Configuracion config;
+    private bool cargando;
 
-    [ObservableProperty] private PasoApp pasoActual = PasoApp.Configuracion;
-    [ObservableProperty] private string rutaOrigen = string.Empty;
-    [ObservableProperty] private string rutaDestino = string.Empty;
+    [ObservableProperty] private Pagina paginaActual = Pagina.Ubicaciones;
+    [ObservableProperty] private Operacion operacionActual = Operacion.Ninguna;
     [ObservableProperty] private bool modoExacto;
     [ObservableProperty] private bool detectarSobrantes = true;
     [ObservableProperty] private string exclusiones = string.Empty;
     [ObservableProperty] private bool verificarCopias = true;
-    [ObservableProperty] private bool temaOscuro;
-    [ObservableProperty] private ModoEmparejado modoEmparejado = ModoEmparejado.UnoAUno;
-    [ObservableProperty] private int resumenCopiados;
-    [ObservableProperty] private int resumenFallidos;
-    [ObservableProperty] private string resumenTiempo = string.Empty;
-
-    public ObservableCollection<ParRutas> ParesManuales { get; } = [];
-    public ObservableCollection<ParRutas> Recientes { get; } = [];
-    public SnackbarMessageQueue Avisos { get; } = new(TimeSpan.FromSeconds(4));
-    public ProgresoModeloVista Progreso { get; } = new();
-    public RevisionModeloVista Revision { get; }
-
-    public bool EsPasoConfiguracion => PasoActual == PasoApp.Configuracion;
-    public bool EsPasoComparando => PasoActual == PasoApp.Comparando;
-    public bool EsPasoRevision => PasoActual == PasoApp.Revision;
-    public bool EsPasoSincronizando => PasoActual == PasoApp.Sincronizando;
-    public bool EsPasoResumen => PasoActual == PasoApp.Resumen;
-    public bool EnOperacion => EsPasoComparando || EsPasoSincronizando;
+    [ObservableProperty] private TemaApp tema;
+    [ObservableProperty] private bool hilosAutomaticos = true;
+    [ObservableProperty] private double hilos = 4;
+    [ObservableProperty] private bool copiaTerminada;
+    [ObservableProperty] private string resumenCopia = string.Empty;
+    [ObservableProperty] private InfoBarSeverity severidadCopia = InfoBarSeverity.Success;
+    [ObservableProperty] private string paresDeLaComparacion = string.Empty;
 
     public PrincipalModeloVista()
     {
+        Avisos = new AvisosModeloVista();
+        Origen = new SelectorUbicacionModeloVista("Origen", Avisos);
+        Destino = new SelectorUbicacionModeloVista("Destino", Avisos);
         Revision = new RevisionModeloVista(Avisos);
+        Menu =
+        [
+            new EntradaMenu(Pagina.Ubicaciones, "Ubicaciones", SymbolRegular.FolderSwap24),
+            new EntradaMenu(Pagina.Comparacion, "Comparación", SymbolRegular.BranchCompare24),
+            new EntradaMenu(Pagina.Copia, "Copia", SymbolRegular.DocumentCopy24),
+        ];
+        MenuInferior = new EntradaMenu(Pagina.Configuracion, "Configuración", SymbolRegular.Settings24) { Disponible = true };
         config = Configuracion.Cargar();
-        AplicarConfiguracion(config);
+        AplicarConfiguracion();
+        ActualizarMenu();
     }
 
-    private void AplicarConfiguracion(Configuracion c)
+    public AvisosModeloVista Avisos { get; }
+
+    public SelectorUbicacionModeloVista Origen { get; }
+
+    public SelectorUbicacionModeloVista Destino { get; }
+
+    public RevisionModeloVista Revision { get; }
+
+    public ProgresoModeloVista Progreso { get; } = new();
+
+    public IReadOnlyList<EntradaMenu> Menu { get; }
+
+    public EntradaMenu MenuInferior { get; }
+
+    public ObservableCollection<ParRutas> ParesExtra { get; } = [];
+
+    public ObservableCollection<ParRutas> Recientes { get; } = [];
+
+    public IReadOnlyList<TemaApp> Temas { get; } = Enum.GetValues<TemaApp>();
+
+    public bool Ocupado => OperacionActual != Operacion.Ninguna;
+
+    public bool Comparando => OperacionActual == Operacion.Comparando;
+
+    public bool Copiando => OperacionActual == Operacion.Copiando;
+
+    public bool MostrarTabla => !Comparando && Revision.HayResultado;
+
+    public int HilosMinimo => Concurrencia.Minimo;
+
+    public int HilosMaximo => Concurrencia.Maximo;
+
+    public string Version { get; } = $"Versión {typeof(PrincipalModeloVista).Assembly.GetName().Version?.ToString(3)}";
+
+    public bool ModoRapido
     {
-        ModoExacto = c.ModoExacto;
-        DetectarSobrantes = c.DetectarSobrantes;
-        Exclusiones = c.Exclusiones;
-        VerificarCopias = c.VerificarCopias;
-        TemaOscuro = c.TemaOscuro;
+        get => !ModoExacto;
+        set => ModoExacto = !value;
+    }
+
+    public string DescripcionHilos => HilosAutomaticos
+        ? "Automático: 2 en memorias USB, 4 en discos y red, 1 con teléfonos"
+        : $"{(int)Hilos} copias a la vez (con un teléfono siempre se usa 1)";
+
+    private void AplicarConfiguracion()
+    {
+        cargando = true;
+        ModoExacto = config.ModoExacto;
+        DetectarSobrantes = config.DetectarSobrantes;
+        Exclusiones = config.Exclusiones;
+        VerificarCopias = config.VerificarCopias;
+        Tema = config.Tema;
+        HilosAutomaticos = config.HilosAutomaticos;
+        Hilos = config.Hilos;
+        CargarRecientes();
+        if (Recientes.Count > 0)
+        {
+            UsarReciente(Recientes[0]);
+        }
+
+        cargando = false;
+    }
+
+    private void CargarRecientes()
+    {
         Recientes.Clear();
-        foreach (var par in c.Recientes)
+        foreach (var par in config.Recientes)
         {
             Recientes.Add(par);
         }
-
-        if (Recientes.Count > 0)
-        {
-            RutaOrigen = Recientes[0].Origen;
-            RutaDestino = Recientes[0].Destino;
-        }
-
-        ActualizarTemaVisual(TemaOscuro);
     }
 
-    private void GuardarConfiguracionActual()
+    private void Guardar()
     {
+        if (cargando)
+        {
+            return;
+        }
+
         config = config with
         {
             ModoExacto = ModoExacto,
             DetectarSobrantes = DetectarSobrantes,
             Exclusiones = Exclusiones,
             VerificarCopias = VerificarCopias,
-            TemaOscuro = TemaOscuro,
+            Tema = Tema,
+            HilosAutomaticos = HilosAutomaticos,
+            Hilos = (int)Hilos,
         };
         config.Guardar();
     }
 
-    partial void OnPasoActualChanged(PasoApp value)
+    partial void OnModoExactoChanged(bool value) => OnPropertyChanged(nameof(ModoRapido));
+
+    partial void OnTemaChanged(TemaApp value)
     {
-        OnPropertyChanged(nameof(EsPasoConfiguracion));
-        OnPropertyChanged(nameof(EsPasoComparando));
-        OnPropertyChanged(nameof(EsPasoRevision));
-        OnPropertyChanged(nameof(EsPasoSincronizando));
-        OnPropertyChanged(nameof(EsPasoResumen));
-        OnPropertyChanged(nameof(EnOperacion));
+        Apariencia.Aplicar(value);
+        Guardar();
     }
 
-    public bool ModoRapido
+    partial void OnVerificarCopiasChanged(bool value) => Guardar();
+
+    partial void OnHilosAutomaticosChanged(bool value)
     {
-        get => !ModoExacto;
-        set
+        OnPropertyChanged(nameof(DescripcionHilos));
+        Guardar();
+    }
+
+    partial void OnHilosChanged(double value)
+    {
+        OnPropertyChanged(nameof(DescripcionHilos));
+        Guardar();
+    }
+
+    partial void OnPaginaActualChanged(Pagina value) => ActualizarMenu();
+
+    partial void OnCopiaTerminadaChanged(bool value) => ActualizarMenu();
+
+    partial void OnOperacionActualChanged(Operacion value)
+    {
+        OnPropertyChanged(nameof(Ocupado));
+        OnPropertyChanged(nameof(Comparando));
+        OnPropertyChanged(nameof(Copiando));
+        OnPropertyChanged(nameof(MostrarTabla));
+        IniciarComparacionCommand.NotifyCanExecuteChanged();
+        IniciarCopiaCommand.NotifyCanExecuteChanged();
+        ActualizarMenu();
+    }
+
+    private void ActualizarMenu()
+    {
+        foreach (var entrada in Menu.Append(MenuInferior))
         {
-            if (value)
-            {
-                ModoExacto = false;
-            }
+            entrada.EsActual = entrada.Pagina == PaginaActual;
         }
-    }
 
-    public PackIconKind IconoTema => TemaOscuro ? PackIconKind.WeatherSunny : PackIconKind.WeatherNight;
-
-    partial void OnModoExactoChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ModoRapido));
-    }
-
-    partial void OnTemaOscuroChanged(bool value)
-    {
-        ActualizarTemaVisual(value);
-        GuardarConfiguracionActual();
-        OnPropertyChanged(nameof(IconoTema));
-    }
-
-    private void ActualizarTemaVisual(bool oscuro)
-    {
-        var theme = paleta.GetTheme();
-        theme.SetBaseTheme(oscuro ? BaseTheme.Dark : BaseTheme.Light);
-        paleta.SetTheme(theme);
+        Menu[0].Disponible = true;
+        Menu[0].Estado = string.Empty;
+        Menu[1].Disponible = Comparando || Revision.HayResultado;
+        Menu[1].Estado = Comparando ? "En curso" : Revision.HayResultado ? $"{Revision.Pendientes:N0} por copiar" : string.Empty;
+        Menu[2].Disponible = Copiando || CopiaTerminada;
+        Menu[2].Estado = Copiando ? "En curso" : CopiaTerminada ? "Terminada" : string.Empty;
     }
 
     [RelayCommand]
-    private void AlternarTema() => TemaOscuro = !TemaOscuro;
-
-    [RelayCommand]
-    private void ExaminarOrigen()
+    private void Navegar(EntradaMenu? entrada)
     {
-        var carpetas = Escritorio.ElegirCarpetas("Seleccionar carpeta de origen", varias: false);
-        if (carpetas.Count > 0)
+        if (entrada is { Disponible: true })
         {
-            RutaOrigen = carpetas[0];
-        }
-    }
-
-    [RelayCommand]
-    private void ExaminarDestino()
-    {
-        var carpetas = Escritorio.ElegirCarpetas("Seleccionar carpeta de destino", varias: false);
-        if (carpetas.Count > 0)
-        {
-            RutaDestino = carpetas[0];
+            PaginaActual = entrada.Pagina;
         }
     }
 
     [RelayCommand]
     private void UsarReciente(ParRutas? par)
     {
-        if (par is null) return;
-        RutaOrigen = par.Origen;
-        RutaDestino = par.Destino;
+        if (par is null)
+        {
+            return;
+        }
+
+        Origen.Ruta = par.Origen;
+        Destino.Ruta = par.Destino;
     }
 
     [RelayCommand]
-    private void IntercambiarRutas()
-    {
-        (RutaOrigen, RutaDestino) = (RutaDestino, RutaOrigen);
-    }
+    private void IntercambiarRutas() => (Origen.Ruta, Destino.Ruta) = (Destino.Ruta, Origen.Ruta);
 
     [RelayCommand]
     private void AgregarPar()
     {
-        if (string.IsNullOrWhiteSpace(RutaOrigen) || string.IsNullOrWhiteSpace(RutaDestino))
+        if (ParActual() is not { } par)
         {
-            Avisos.Enqueue("Debe especificar tanto el origen como el destino");
+            Avisos.Advertir("Elige un origen y un destino antes de agregarlos a la lista");
             return;
         }
 
-        var par = new ParRutas(RutaOrigen.Trim(), RutaDestino.Trim());
-        if (!ParesManuales.Contains(par))
+        if (!ParesExtra.Contains(par))
         {
-            ParesManuales.Add(par);
-            Avisos.Enqueue("Par añadido a la lista");
+            ParesExtra.Add(par);
         }
+
+        Origen.Ruta = string.Empty;
+        Destino.Ruta = string.Empty;
     }
 
     [RelayCommand]
@@ -199,174 +271,131 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     {
         if (par is not null)
         {
-            ParesManuales.Remove(par);
+            ParesExtra.Remove(par);
         }
     }
 
-    [RelayCommand]
-    private void LimpiarPares() => ParesManuales.Clear();
+    private ParRutas? ParActual() => string.IsNullOrWhiteSpace(Origen.Ruta) || string.IsNullOrWhiteSpace(Destino.Ruta)
+        ? null
+        : new ParRutas(Origen.Ruta.Trim(), Destino.Ruta.Trim());
 
-    public IReadOnlyList<ParRutas> ObtenerParesAComparar()
-    {
-        if (ParesManuales.Count > 0)
-        {
-            return ParesManuales.ToList();
-        }
+    private IReadOnlyList<ParRutas> ParesAComparar() => ParActual() is { } actual && !ParesExtra.Contains(actual)
+        ? [.. ParesExtra, actual]
+        : [.. ParesExtra];
 
-        if (string.IsNullOrWhiteSpace(RutaOrigen) || string.IsNullOrWhiteSpace(RutaDestino))
-        {
-            return [];
-        }
+    private bool PuedeEmpezar() => !Ocupado;
 
-        return [new ParRutas(RutaOrigen.Trim(), RutaDestino.Trim())];
-    }
-
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(PuedeEmpezar))]
     private async Task IniciarComparacionAsync()
     {
-        var pares = ObtenerParesAComparar();
+        var pares = ParesAComparar();
         if (pares.Count == 0)
         {
-            Avisos.Enqueue("Seleccione una carpeta de origen y una de destino");
+            Avisos.Advertir("Elige una carpeta de origen y una de destino");
             return;
         }
 
-        foreach (var par in pares)
-        {
-            if (!Directory.Exists(par.Origen))
-            {
-                Avisos.Enqueue($"La carpeta de origen no existe: {par.Origen}");
-                return;
-            }
-            if (!Directory.Exists(par.Destino))
-            {
-                try
-                {
-                    Directory.CreateDirectory(par.Destino);
-                }
-                catch (Exception error)
-                {
-                    Avisos.Enqueue($"No se pudo acceder al destino: {error.Message}");
-                    return;
-                }
-            }
-        }
-
         config = config.ConRecientes(pares);
-        GuardarConfiguracionActual();
-        Recientes.Clear();
-        foreach (var r in config.Recientes)
-        {
-            Recientes.Add(r);
-        }
-
+        Guardar();
+        CargarRecientes();
+        ParesDeLaComparacion = string.Join("   ·   ", pares.Select(par => $"{par.Origen}  →  {par.Destino}"));
         var opciones = new OpcionesComparacion
         {
             Modo = ModoExacto ? ModoComparacion.Exacto : ModoComparacion.Rapido,
             DetectarSobrantes = DetectarSobrantes,
             Exclusiones = FiltroExclusiones.DesdeTexto(Exclusiones),
+            HilosManuales = HilosAutomaticos ? null : (int)Hilos,
         };
 
         var progreso = new ProgresoOperacion();
         Progreso.Seguir(progreso);
-        PasoActual = PasoApp.Comparando;
-        cts = new CancellationTokenSource();
-
+        OperacionActual = Operacion.Comparando;
+        PaginaActual = Pagina.Comparacion;
+        cancelacion = new CancellationTokenSource();
         using var suspension = PrevencionSuspension.Activar();
         try
         {
-            var comparador = new ComparadorCarpetas();
-            var resultado = await comparador.CompararAsync(pares, opciones, progreso, cts.Token);
-            Progreso.Detener();
+            var resultado = await new ComparadorCarpetas().CompararAsync(pares, opciones, progreso, cancelacion.Token);
             Revision.Cargar(resultado);
-            PasoActual = PasoApp.Revision;
+            CopiaTerminada = false;
+            if (Revision.TodoSincronizado)
+            {
+                Avisos.Exito("Todo está igual: no hay nada que copiar");
+            }
         }
         catch (OperationCanceledException)
         {
-            Progreso.Detener();
-            Avisos.Enqueue("Comparación cancelada por el usuario");
-            PasoActual = PasoApp.Configuracion;
+            Avisos.Informar("Comparación cancelada");
+            PaginaActual = Revision.HayResultado ? Pagina.Comparacion : Pagina.Ubicaciones;
         }
-        catch (Exception error)
+        catch (Exception error) when (error is not OutOfMemoryException)
         {
-            Progreso.Detener();
-            Avisos.Enqueue($"Error en la comparación: {error.Message}");
-            PasoActual = PasoApp.Configuracion;
+            Avisos.Error(error.Message);
+            PaginaActual = Pagina.Ubicaciones;
         }
         finally
         {
-            cts.Dispose();
-            cts = null;
+            Progreso.Detener();
+            Terminar();
         }
     }
 
     [RelayCommand]
-    private void CancelarOperacion()
-    {
-        cts?.Cancel();
-    }
+    private void Cancelar() => cancelacion?.Cancel();
 
-    [RelayCommand]
-    private void VolverAConfiguracion()
+    [RelayCommand(CanExecute = nameof(PuedeEmpezar))]
+    private async Task IniciarCopiaAsync()
     {
-        PasoActual = PasoApp.Configuracion;
-    }
-
-    [RelayCommand]
-    private void VolverARevision()
-    {
-        PasoActual = PasoApp.Revision;
-    }
-
-    [RelayCommand]
-    private async Task IniciarSincronizacionAsync()
-    {
-        var seleccionados = Revision.Todos.Where(e => e.Seleccionado && e.SePuedeSincronizar).ToList();
-        if (seleccionados.Count == 0)
+        if (Revision.Seleccionados == 0)
         {
-            Avisos.Enqueue("No hay elementos seleccionados para sincronizar");
+            Avisos.Advertir("No hay nada seleccionado para copiar");
             return;
         }
 
         var progreso = new ProgresoOperacion();
         Progreso.Seguir(progreso);
-        PasoActual = PasoApp.Sincronizando;
-        cts = new CancellationTokenSource();
-
-        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        CopiaTerminada = false;
+        OperacionActual = Operacion.Copiando;
+        PaginaActual = Pagina.Copia;
+        Revision.PausarAvisos();
+        cancelacion = new CancellationTokenSource();
+        var reloj = Stopwatch.StartNew();
         using var suspension = PrevencionSuspension.Activar();
         try
         {
-            var sincronizador = new SincronizadorArchivos();
-            var resumen = await sincronizador.SincronizarAsync(Revision.Todos, VerificarCopias, progreso, cts.Token);
-            Progreso.Detener();
-            reloj.Stop();
-
-            ResumenCopiados = resumen.Copiados;
-            ResumenFallidos = resumen.Fallidos.Count;
-            ResumenTiempo = Formatos.Duracion(reloj.Elapsed);
-            Revision.Recontar();
-
-            PasoActual = PasoApp.Resumen;
+            var resumen = await new SincronizadorArchivos().SincronizarAsync(
+                Revision.Todos, VerificarCopias, HilosAutomaticos ? null : (int)Hilos, progreso, cancelacion.Token);
+            SeveridadCopia = resumen.Fallidos.IsEmpty ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
+            ResumenCopia = resumen.Fallidos.IsEmpty
+                ? $"Se copiaron {resumen.Copiados:N0} elementos en {Formatos.Duracion(reloj.Elapsed)}" + (VerificarCopias ? ", todos verificados con SHA-256." : ".")
+                : $"Se copiaron {resumen.Copiados:N0} elementos y {resumen.Fallidos.Count:N0} fallaron. Abajo está el motivo de cada uno.";
         }
         catch (OperationCanceledException)
         {
-            Progreso.Detener();
-            Revision.Recontar();
-            Avisos.Enqueue("Sincronización cancelada. Los archivos pendientes no se modificaron.");
-            PasoActual = PasoApp.Revision;
+            SeveridadCopia = InfoBarSeverity.Informational;
+            ResumenCopia = "Copia cancelada. Lo que no terminó de copiarse quedó como estaba: no hay archivos a medias.";
         }
-        catch (Exception error)
+        catch (Exception error) when (error is not OutOfMemoryException)
         {
-            Progreso.Detener();
-            Revision.Recontar();
-            Avisos.Enqueue($"Error durante la sincronización: {error.Message}");
-            PasoActual = PasoApp.Revision;
+            SeveridadCopia = InfoBarSeverity.Error;
+            ResumenCopia = $"La copia se detuvo: {error.Message}";
         }
         finally
         {
-            cts.Dispose();
-            cts = null;
+            Progreso.Detener();
+            Revision.ReanudarAvisos();
+            CopiaTerminada = true;
+            Terminar();
         }
     }
+
+    private void Terminar()
+    {
+        cancelacion?.Dispose();
+        cancelacion = null;
+        OperacionActual = Operacion.Ninguna;
+    }
+
+    [RelayCommand]
+    private void IrA(Pagina pagina) => PaginaActual = pagina;
 }

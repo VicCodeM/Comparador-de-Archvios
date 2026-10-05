@@ -100,11 +100,11 @@ public sealed class ComparadorCarpetasPruebas : IDisposable
         using var otras = new CarpetasDePrueba();
         CarpetasDePrueba.Escribir(carpetas.Origen, "a.txt", "1");
         CarpetasDePrueba.Escribir(otras.Origen, "b.txt", "2");
-        var pares = GeneradorPares.Generar([carpetas.Origen, otras.Origen], [carpetas.Destino, otras.Destino], ModoEmparejado.UnoAUno);
+        ParRutas[] pares = [new(carpetas.Origen, carpetas.Destino), new(otras.Origen, otras.Destino)];
 
         var resultado = await new ComparadorCarpetas().CompararAsync(pares, new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
 
-        Assert.Equal(2, resultado.Contar(EstadoElemento.Falta));
+        Assert.Equal(2, resultado.Elementos.Count(e => e.Estado == EstadoElemento.Falta));
         Assert.Equal(otras.Destino, resultado.Elementos.Single(e => e.RutaRelativa == "b.txt").Par.Destino);
     }
 

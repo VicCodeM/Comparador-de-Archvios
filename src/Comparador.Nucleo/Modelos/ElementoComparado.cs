@@ -39,6 +39,9 @@ public sealed class ElementoComparado : INotifyPropertyChanged
 
     public string Nombre => Path.GetFileName(RutaRelativa);
 
+    /// <summary>La carpeta donde está, relativa a la raíz ("" si está en la raíz).</summary>
+    public string Carpeta => Path.GetDirectoryName(RutaRelativa) ?? string.Empty;
+
     public string Extension => EsCarpeta ? string.Empty : Path.GetExtension(RutaRelativa);
 
     public string RutaOrigen => Path.Combine(Par.Origen, RutaRelativa);

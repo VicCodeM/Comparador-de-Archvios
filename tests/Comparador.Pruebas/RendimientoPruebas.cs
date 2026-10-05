@@ -36,7 +36,7 @@ public sealed class RendimientoPruebas : IDisposable
 
         var resultado = await trabajo;
 
-        Assert.Equal(Archivos + 200, resultado.Contar(EstadoElemento.Falta));
+        Assert.Equal(Archivos + 200, resultado.Elementos.Count(e => e.Estado == EstadoElemento.Falta));
         Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(30), $"Tardó {reloj.Elapsed}");
         Assert.True(lecturas > 1, "El progreso debe poder leerse mientras se compara");
     }

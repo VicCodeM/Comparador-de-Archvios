@@ -6,7 +6,6 @@ using Comparador.Nucleo.Modelos;
 using Comparador.Nucleo.Servicios;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MaterialDesignThemes.Wpf;
 
 namespace Comparador.App.ModelosVista;
 
@@ -28,11 +27,12 @@ public enum FiltroRevision
 public sealed partial class RevisionModeloVista : ObservableObject
 {
     private readonly DispatcherTimer esperaBusqueda = new() { Interval = TimeSpan.FromMilliseconds(300) };
-    private readonly ISnackbarMessageQueue avisos;
+    private readonly AvisosModeloVista avisos;
     private IReadOnlyList<ElementoComparado> todos = [];
     private long seleccionados;
     private long bytesSeleccionados;
     private bool enLote;
+    private bool pausado;
 
     [ObservableProperty] private IReadOnlyList<ElementoComparado> visibles = [];
     [ObservableProperty] private FiltroRevision filtro = FiltroRevision.Pendientes;
@@ -44,7 +44,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
     [ObservableProperty] private int problemas;
     [ObservableProperty] private int iguales;
 
-    public RevisionModeloVista(ISnackbarMessageQueue avisos)
+    public RevisionModeloVista(AvisosModeloVista avisos)
     {
         this.avisos = avisos;
         esperaBusqueda.Tick += (_, _) => AplicarFiltro();
@@ -56,7 +56,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
 
     public long Seleccionados => Interlocked.Read(ref seleccionados);
 
-    public string ResumenSeleccion => $"{Seleccionados:N0} seleccionados para sincronizar  ·  {Formatos.Tamano(Interlocked.Read(ref bytesSeleccionados))}";
+    public string ResumenSeleccion => $"{Seleccionados:N0} seleccionados para copiar  ·  {Formatos.Tamano(Interlocked.Read(ref bytesSeleccionados))}";
 
     public bool TodoSincronizado => Pendientes == 0;
 
@@ -74,8 +74,25 @@ public sealed partial class RevisionModeloVista : ObservableObject
         }
 
         Duracion = Formatos.Duracion(resultado.Duracion);
+        OnPropertyChanged(nameof(HayResultado));
         Recontar();
         Filtro = Pendientes > 0 ? FiltroRevision.Pendientes : FiltroRevision.Todos;
+        AplicarFiltro();
+    }
+
+    public bool HayResultado => todos.Count > 0;
+
+    /// <summary>
+    /// Mientras se copia, cada archivo terminado cambia su selección desde otro hilo. Avisar a la pantalla por cada
+    /// uno llenaba la cola de la ventana con cientos de miles de repintados y la congelaba: se pausa y al final se
+    /// recuenta una sola vez.
+    /// </summary>
+    public void PausarAvisos() => pausado = true;
+
+    public void ReanudarAvisos()
+    {
+        pausado = false;
+        Recontar();
         AplicarFiltro();
     }
 
@@ -136,7 +153,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
         var signo = elemento.Seleccionado ? 1 : -1;
         Interlocked.Add(ref seleccionados, signo);
         Interlocked.Add(ref bytesSeleccionados, signo * elemento.TamanoACopiar);
-        if (!enLote)
+        if (!enLote && !pausado)
         {
             AvisarSeleccion();
         }
@@ -182,7 +199,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
         }
 
         await ExportadorReporte.GuardarCsvAsync(archivo, Visibles, CancellationToken.None);
-        avisos.Enqueue($"Reporte guardado con {Visibles.Count:N0} filas", "ABRIR", () => Escritorio.Abrir(archivo));
+        avisos.Exito($"Reporte guardado con {Visibles.Count:N0} filas", "Abrir", () => Escritorio.Abrir(archivo));
     }
 
     [RelayCommand]
@@ -198,17 +215,22 @@ public sealed partial class RevisionModeloVista : ObservableObject
     private void CopiarRuta(ElementoComparado? elemento) => Intentar(() => Clipboard.SetText(elemento!.RutaOrigen), elemento);
 
     [RelayCommand]
-    private void QuienLoUsa(ElementoComparado? elemento)
+    private async Task QuienLoUsaAsync(ElementoComparado? elemento)
     {
         if (elemento is null)
         {
             return;
         }
 
-        var programas = DetectorBloqueos.QuienLoUsa(elemento.RutaOrigen).Concat(DetectorBloqueos.QuienLoUsa(elemento.RutaDestino)).Distinct().ToList();
-        avisos.Enqueue(programas.Count == 0
-            ? $"Ningún programa tiene abierto \"{elemento.Nombre}\" ahora mismo"
-            : $"\"{elemento.Nombre}\" está abierto en: {string.Join(", ", programas)}. Ciérralo y vuelve a sincronizar.");
+        var programas = await Task.Run(() => DetectorBloqueos.QuienLoUsa(elemento.RutaOrigen).Concat(DetectorBloqueos.QuienLoUsa(elemento.RutaDestino)).Distinct().ToList());
+        if (programas.Count == 0)
+        {
+            avisos.Informar($"Ningún programa tiene abierto \"{elemento.Nombre}\" ahora mismo");
+        }
+        else
+        {
+            avisos.Advertir($"\"{elemento.Nombre}\" está abierto en: {string.Join(", ", programas)}. Ciérralo y vuelve a copiar.");
+        }
     }
 
     private void Intentar(Action accion, ElementoComparado? elemento)
@@ -224,7 +246,7 @@ public sealed partial class RevisionModeloVista : ObservableObject
         }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or System.IO.IOException or System.Runtime.InteropServices.ExternalException)
         {
-            avisos.Enqueue($"No se pudo: {error.Message}");
+            avisos.Error($"No se pudo: {error.Message}");
         }
     }
 }

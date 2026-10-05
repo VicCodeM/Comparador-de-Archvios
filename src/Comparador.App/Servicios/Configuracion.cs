@@ -4,6 +4,13 @@ using Comparador.Nucleo.Modelos;
 
 namespace Comparador.App.Servicios;
 
+public enum TemaApp
+{
+    Sistema,
+    Claro,
+    Oscuro,
+}
+
 /// <summary>
 /// Lo que la app recuerda entre usos. Solo opciones que de verdad hacen algo: la versión anterior tenía 92
 /// opciones y 81 no se usaban en ninguna parte.
@@ -22,7 +29,12 @@ public sealed record Configuracion
 
     public bool VerificarCopias { get; init; } = true;
 
-    public bool TemaOscuro { get; init; }
+    public TemaApp Tema { get; init; } = TemaApp.Sistema;
+
+    /// <summary>Si es true, los hilos se deciden según el dispositivo (USB, red, disco, teléfono).</summary>
+    public bool HilosAutomaticos { get; init; } = true;
+
+    public int Hilos { get; init; } = 4;
 
     private static readonly string Archivo = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VMSofts", "ComparadorArchivos", "configuracion.json");
@@ -41,8 +53,15 @@ public sealed record Configuracion
 
     public void Guardar()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Archivo)!);
-        File.WriteAllText(Archivo, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Archivo)!);
+            File.WriteAllText(Archivo, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // No poder guardar las preferencias no debe tumbar la app: se usan las de esta sesión.
+        }
     }
 
     public Configuracion ConRecientes(IEnumerable<ParRutas> usados) => this with

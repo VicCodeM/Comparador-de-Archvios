@@ -7,11 +7,16 @@ namespace Comparador.App.Servicios;
 /// <summary>Lo que la app le pide a Windows: elegir carpetas, guardar archivos, abrir y mostrar en el Explorador.</summary>
 public static class Escritorio
 {
-    public static IReadOnlyList<string> ElegirCarpetas(string titulo, bool varias)
+    /// <summary>El diálogo de Windows ya deja elegir memorias USB, unidades de red y rutas \\servidor\carpeta.</summary>
+    public static string? ElegirCarpeta(string titulo, string? inicial = null)
     {
-        var dialogo = new OpenFolderDialog { Title = titulo, Multiselect = varias };
+        var dialogo = new OpenFolderDialog { Title = titulo, Multiselect = false };
+        if (!string.IsNullOrWhiteSpace(inicial))
+        {
+            dialogo.InitialDirectory = inicial;
+        }
 
-        return dialogo.ShowDialog() == true ? dialogo.FolderNames : [];
+        return dialogo.ShowDialog() == true ? dialogo.FolderName : null;
     }
 
     public static string? ElegirDondeGuardar(string titulo, string nombre, string filtro)
