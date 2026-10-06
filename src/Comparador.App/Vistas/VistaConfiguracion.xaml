@@ -84,6 +84,16 @@
                 </ui:CardControl.Header>
                 <ui:ToggleSwitch IsChecked="{Binding IntegradoExplorador}" />
             </ui:CardControl>
+            <ui:CardControl Icon="{ui:SymbolIcon ClipboardPaste24}" Margin="0,4,0,0">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Pegar con Espejo (Ctrl+V)" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
+                                   Text="Lo que copies (Ctrl+C) o cortes (Ctrl+X) en el Explorador lo pega Espejo con su ventanita, en lugar de Windows. Espejo se queda junto al reloj y arranca con Windows. Si algo falla, pega Windows como siempre. Pegar texto u otras cosas no cambia." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding PegarConEspejo}" />
+            </ui:CardControl>
 
             <TextBlock Text="Permisos" Style="{StaticResource TituloSeccion}" />
             <ui:CardControl Icon="{ui:SymbolIcon ShieldTask24}">

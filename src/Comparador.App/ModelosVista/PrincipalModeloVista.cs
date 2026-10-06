@@ -62,6 +62,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [ObservableProperty] private ReglaConflicto siYaExiste = ReglaConflicto.Reemplazar;
     [ObservableProperty] private bool enPausa;
     [ObservableProperty] private bool integradoExplorador = IntegracionExplorador.EstaInstalada();
+    [ObservableProperty] private bool pegarConEspejo;
     [ObservableProperty] private bool copiaTerminada;
     [ObservableProperty] private string resumenCopia = string.Empty;
     [ObservableProperty] private InfoBarSeverity severidadCopia = InfoBarSeverity.Success;
@@ -173,6 +174,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Hilos = config.Hilos;
         EvitarSuspension = config.EvitarSuspension;
         SiYaExiste = config.SiYaExiste;
+        PegarConEspejo = config.PegarConEspejo;
         CargarRecientes();
         if (Recientes.Count > 0)
         {
@@ -209,6 +211,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             Hilos = (int)Hilos,
             EvitarSuspension = EvitarSuspension,
             SiYaExiste = SiYaExiste,
+            PegarConEspejo = PegarConEspejo,
         };
         config.Guardar();
     }
@@ -226,6 +229,29 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     partial void OnEvitarSuspensionChanged(bool value) => Guardar();
 
     partial void OnSiYaExisteChanged(ReglaConflicto value) => Guardar();
+
+    /// <summary>Ctrl+V en el Explorador lo pega Espejo (en segundo plano, junto al reloj) o vuelve a ser de Windows.</summary>
+    partial void OnPegarConEspejoChanged(bool value)
+    {
+        if (cargando)
+        {
+            return;
+        }
+
+        try
+        {
+            ((App)System.Windows.Application.Current).CambiarResidente(value);
+            Guardar();
+            if (value)
+            {
+                Avisos.Exito("Listo: Ctrl+V en el Explorador ahora lo pega Espejo. Al cerrar la ventana sigue junto al reloj.");
+            }
+        }
+        catch (Exception error) when (error is InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            Avisos.Error($"No se pudo cambiar quién pega en el Explorador: {error.Message}");
+        }
+    }
 
     /// <summary>Pone o quita las opciones del clic derecho del Explorador (solo para este usuario).</summary>
     partial void OnIntegradoExploradorChanged(bool value)

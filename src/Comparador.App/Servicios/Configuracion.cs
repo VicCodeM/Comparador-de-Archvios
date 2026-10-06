@@ -42,6 +42,9 @@ public sealed record Configuracion
     /// <summary>Qué hacer si el archivo ya existe en el destino y es distinto.</summary>
     public ReglaConflicto SiYaExiste { get; init; } = ReglaConflicto.Reemplazar;
 
+    /// <summary>Espejo en segundo plano pega lo que se copia o corta en el Explorador (Ctrl+V), en lugar de Windows.</summary>
+    public bool PegarConEspejo { get; init; }
+
     private static readonly string Archivo = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VMSofts", "ComparadorArchivos", "configuracion.json");
 

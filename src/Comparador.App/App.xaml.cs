@@ -12,6 +12,7 @@ namespace Comparador.App;
 public partial class App : Application
 {
     private InstanciaUnica? instancia;
+    private ModoResidente? residente;
 
     /// <summary>La cola de copias rápidas: la usan el Explorador y el botón "Copiar archivos..." de la ventana principal.</summary>
     public static ColaDeCopias Cola { get; private set; } = null!;
@@ -26,17 +27,41 @@ public partial class App : Application
             return;
         }
 
-        Apariencia.Aplicar(Configuracion.Cargar().Tema);
+        var config = Configuracion.Cargar();
+        Apariencia.Aplicar(config.Tema);
         Cola = new ColaDeCopias(new AccionesArchivo(new AvisosModeloVista()));
         instancia.Escuchar(Recibir, MostrarPrincipal);
+        CambiarResidente(config.PegarConEspejo);
         if (LineaDeComandos.Interpretar(e.Args) is { } pedido)
         {
             instancia.RecibirPropio(pedido, Recibir);
         }
-        else
+        else if (residente is null || e.Args is not [ModoResidente.Argumento])
         {
             MostrarPrincipal();
         }
+    }
+
+    /// <summary>Activa o quita el modo en segundo plano (Ctrl+V del Explorador, icono junto al reloj, arranque con Windows).</summary>
+    public void CambiarResidente(bool activo)
+    {
+        residente?.Dispose();
+        residente = activo ? new ModoResidente(PegarDesdeExplorador, MostrarPrincipal, () => Shutdown()) : null;
+        ModoResidente.ArrancarConWindows(activo);
+        ShutdownMode = activo ? ShutdownMode.OnExplicitShutdown : ShutdownMode.OnLastWindowClose;
+    }
+
+    /// <summary>False si la carpeta no es real (Este equipo, un .zip) o lo copiado ya no son archivos: pega Windows.</summary>
+    private bool PegarDesdeExplorador(IntPtr ventana)
+    {
+        if (CarpetaExplorador.Actual(ventana) is not { } carpeta || LineaDeComandos.Interpretar(["pegar", carpeta]) is not { } pedido)
+        {
+            return false;
+        }
+
+        Recibir(pedido);
+
+        return true;
     }
 
     private void Recibir(PedidoExterno pedido)
@@ -45,7 +70,7 @@ public partial class App : Application
         {
             Cola.Agregar(listo);
         }
-        else if (Windows.Count == 0)
+        else if (Windows.Count == 0 && residente is null)
         {
             // Se canceló la elección del destino y no hay nada abierto: no dejar la app viva sin ventana.
             Shutdown();
@@ -69,6 +94,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         CatalogoUbicaciones.CerrarTelefonos();
+        residente?.Dispose();
         instancia?.Dispose();
         base.OnExit(e);
     }
