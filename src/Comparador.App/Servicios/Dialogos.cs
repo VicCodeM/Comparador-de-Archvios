@@ -16,4 +16,8 @@ public static class Dialogos
 
         return ventana.ShowDialog() == true ? modelo.RutaElegida : null;
     }
+
+    /// <summary>True si el usuario confirmó; si el destino es un disco, tuvo que escribir BORRAR.</summary>
+    public static bool ConfirmarClonado(string resumen, bool borraDatos) =>
+        new ConfirmarClonVentana(resumen, borraDatos) { Owner = Application.Current.MainWindow }.ShowDialog() == true;
 }

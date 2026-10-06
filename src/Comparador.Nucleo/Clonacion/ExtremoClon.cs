@@ -45,6 +45,20 @@ public abstract record ExtremoClon
             : new DeImagen(texto);
     }
 
+    /// <summary>Con palabras, para la pantalla y la ventanita: "Disco 2 · SanDisk Ultra · 29.72 GB" o el nombre de la imagen.</summary>
+    public string Describir(IReadOnlyList<DiscoFisico> discos)
+    {
+        var disco = discos.FirstOrDefault(candidato => candidato.Numero == NumeroDisco);
+
+        return (this, disco) switch
+        {
+            (DeImagen imagen, _) => Path.GetFileName(imagen.Ruta),
+            (DeDisco, not null) => $"Disco {disco.Numero} · {disco.Titulo} · {Servicios.Formatos.Tamano(disco.Tamano)}",
+            (DeParticion particion, not null) => $"Partición {particion.Particion} del disco {disco.Numero} · {disco.Titulo}",
+            _ => Texto,
+        };
+    }
+
     /// <summary>Qué trozo de qué disco es, con el estado actual de los discos. Null si es una imagen o ya no existe.</summary>
     public (DiscoFisico Disco, long Inicio, long Largo)? Tramo(IReadOnlyList<DiscoFisico> discos)
     {

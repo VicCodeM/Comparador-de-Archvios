@@ -19,6 +19,14 @@ public static class Escritorio
         return dialogo.ShowDialog() == true ? dialogo.FolderName : null;
     }
 
+    /// <summary>Un solo archivo de los tipos del filtro; null si se canceló.</summary>
+    public static string? ElegirArchivo(string titulo, string filtro)
+    {
+        var dialogo = new OpenFileDialog { Title = titulo, Filter = filtro };
+
+        return dialogo.ShowDialog() == true ? dialogo.FileName : null;
+    }
+
     /// <summary>Archivos sueltos (varios a la vez). Vacío si se canceló.</summary>
     public static IReadOnlyList<string> ElegirArchivos(string titulo)
     {

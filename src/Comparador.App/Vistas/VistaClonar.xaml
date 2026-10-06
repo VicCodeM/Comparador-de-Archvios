@@ -1,0 +1,108 @@
+<UserControl x:Class="Comparador.App.Vistas.VistaClonar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             IsVisibleChanged="AlMostrarse">
+    <UserControl.Resources>
+        <!-- Un disco, con sus particiones debajo y sangradas; lo que no se puede usar se ve apagado y dice por qué -->
+        <DataTemplate x:Key="PlantillaOpcion">
+            <Grid Margin="0,4">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Margin" Value="0,4" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding EsParticion}" Value="True">
+                                <Setter Property="Margin" Value="30,0,0,0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:SymbolIcon Symbol="{Binding Icono}" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding Titulo}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Detalle}" Style="{StaticResource TextoSecundario}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detalle}" />
+                    <TextBlock Text="{Binding Bloqueo}" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                               Visibility="{Binding Disponible, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+        <Style x:Key="FilaOpcion" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="IsEnabled" Value="{Binding Disponible}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="40,28,40,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <StackPanel>
+                <TextBlock Text="Clonar" Style="{StaticResource TituloPagina}" />
+                <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" Margin="0,-8,0,14"
+                           Text="Copia exacta, sector a sector: discos, particiones, memorias USB, tarjetas SD e imágenes (.img, .img.xz, .zip, .gz, como las de Raspberry Pi)." />
+            </StackPanel>
+            <ui:Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,0,0" Content="Actualizar"
+                       Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding ActualizarCommand}"
+                       ToolTip="Vuelve a leer las unidades conectadas (por ejemplo, tras meter una tarjeta)" />
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <TextBlock Text="Origen: qué se copia" Style="{StaticResource TituloSeccion}" Margin="0" VerticalAlignment="Center" />
+                    <ui:Button HorizontalAlignment="Right" Content="Grabar una imagen..." Icon="{ui:SymbolIcon SaveCopy24}"
+                               Command="{Binding ElegirImagenOrigenCommand}" ToolTip="Una imagen .img, .img.xz, .zip o .gz (por ejemplo, Raspberry Pi OS)" />
+                </Grid>
+                <Border Style="{StaticResource Tarjeta}" Padding="4">
+                    <ListBox ItemsSource="{Binding Origenes}" SelectedItem="{Binding Origen}" ItemTemplate="{StaticResource PlantillaOpcion}"
+                             ItemContainerStyle="{StaticResource FilaOpcion}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                </Border>
+            </DockPanel>
+
+            <DockPanel Grid.Column="2">
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <TextBlock Text="Destino: dónde se escribe" Style="{StaticResource TituloSeccion}" Margin="0" VerticalAlignment="Center" />
+                    <ui:Button HorizontalAlignment="Right" Content="Guardar como imagen..." Icon="{ui:SymbolIcon Save24}"
+                               Command="{Binding ElegirImagenDestinoCommand}" ToolTip="Saca una copia del origen a un archivo .img" />
+                </Grid>
+                <Border Style="{StaticResource Tarjeta}" Padding="4">
+                    <ListBox ItemsSource="{Binding Destinos}" SelectedItem="{Binding Destino}" ItemTemplate="{StaticResource PlantillaOpcion}"
+                             ItemContainerStyle="{StaticResource FilaOpcion}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                </Border>
+            </DockPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,14,0,0">
+            <ItemsControl ItemsSource="{Binding Problemas}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <ui:InfoBar Title="{Binding}" Severity="Error" IsOpen="True" IsClosable="False" Margin="0,0,0,6" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,280,0">
+                    <TextBlock Text="{Binding Resumen}" TextWrapping="Wrap" />
+                    <CheckBox Content="Verificar al terminar (relee el destino y compara la huella SHA-256)" IsChecked="{Binding Verificar}" Margin="0,8,0,0" />
+                </StackPanel>
+                <ui:Button HorizontalAlignment="Right" VerticalAlignment="Center" Appearance="Primary" Padding="24,10"
+                           Content="Clonar" Icon="{ui:SymbolIcon Copy24}" Command="{Binding ClonarCommand}"
+                           ToolTip="Pide permiso de administrador y abre la ventanita del clonado" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</UserControl>

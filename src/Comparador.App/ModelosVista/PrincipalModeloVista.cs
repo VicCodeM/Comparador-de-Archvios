@@ -14,6 +14,7 @@ public enum Pagina
     Ubicaciones,
     Comparacion,
     Copia,
+    Clonar,
     Configuracion,
 }
 
@@ -71,6 +72,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     public PrincipalModeloVista()
     {
         Avisos = new AvisosModeloVista();
+        Clonar = new ClonarModeloVista(Avisos);
         Origen = new SelectorUbicacionModeloVista("Origen", Avisos);
         Destino = new SelectorUbicacionModeloVista("Destino", Avisos);
         var acciones = new AccionesArchivo(Avisos);
@@ -81,6 +83,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             new EntradaMenu(Pagina.Ubicaciones, "Ubicaciones", SymbolRegular.FolderSwap24),
             new EntradaMenu(Pagina.Comparacion, "Comparación", SymbolRegular.BranchCompare24),
             new EntradaMenu(Pagina.Copia, "Copia", SymbolRegular.DocumentCopy24),
+            new EntradaMenu(Pagina.Clonar, "Clonar", SymbolRegular.Storage24),
         ];
         MenuInferior = new EntradaMenu(Pagina.Configuracion, "Configuración", SymbolRegular.Settings24) { Disponible = true };
         config = Configuracion.Cargar();
@@ -104,6 +107,8 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     }
 
     public AvisosModeloVista Avisos { get; }
+
+    public ClonarModeloVista Clonar { get; }
 
     public SelectorUbicacionModeloVista Origen { get; }
 
@@ -318,6 +323,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Menu[1].Estado = Comparando ? EnCurso() : Revision.HayResultado ? $"{Revision.Pendientes:N0} por copiar" : string.Empty;
         Menu[2].Disponible = Copiando || CopiaTerminada;
         Menu[2].Estado = Copiando ? EnCurso() : CopiaTerminada ? "Terminada" : string.Empty;
+        Menu[3].Disponible = true;
     }
 
     private string EnCurso() => Progreso.Restante.StartsWith("Faltan", StringComparison.Ordinal) ? Progreso.Restante : "En curso";

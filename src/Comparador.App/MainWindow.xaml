@@ -64,6 +64,7 @@
                     <vistas:VistaUbicaciones Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Ubicaciones}" />
                     <vistas:VistaComparacion Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Comparacion}" />
                     <vistas:VistaCopia Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Copia}" />
+                    <vistas:VistaClonar DataContext="{Binding Clonar}" Visibility="{Binding DataContext.PaginaActual, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IgualAVisible}, ConverterParameter=Clonar}" />
                     <vistas:VistaConfiguracion Visibility="{Binding PaginaActual, Converter={StaticResource IgualAVisible}, ConverterParameter=Configuracion}" />
 
                     <!-- Aviso flotante: el InfoBar de Windows 11 es translúcido, sobre la tabla no se leía. Va sobre una

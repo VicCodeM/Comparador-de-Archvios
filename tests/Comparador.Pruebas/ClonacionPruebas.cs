@@ -82,6 +82,26 @@ public sealed class ClonacionPruebas : IDisposable
     }
 
     [Fact]
+    public void Informa_el_avance_de_copiar_y_de_verificar()
+    {
+        File.WriteAllBytes(Imagen("sd.img"), Patron());
+        using var origen = OrigenClon.DeImagen(Imagen("sd.img"));
+        using var destino = new DestinoEnMemoria();
+        var avances = new List<AvanceClon>();
+
+        MotorClon.Copiar(origen, destino, verificar: true, new ProgresoInmediato(avances.Add), CancellationToken.None);
+
+        Assert.Contains(avances, avance => avance is { Fase: FaseClon.Copiando, Hechos: LargoPatron, Total: LargoPatron });
+        Assert.Contains(avances, avance => avance is { Fase: FaseClon.Verificando, Hechos: LargoPatron });
+    }
+
+    /// <summary>Progress&lt;T&gt; avisa en otro hilo y la prueba acabaría antes; este avisa en el momento.</summary>
+    private sealed class ProgresoInmediato(Action<AvanceClon> alAvisar) : IProgress<AvanceClon>
+    {
+        public void Report(AvanceClon value) => alAvisar(value);
+    }
+
+    [Fact]
     public void Si_lo_escrito_no_es_identico_falla_y_no_lo_da_por_terminado()
     {
         File.WriteAllBytes(Imagen("sd.img"), Patron());

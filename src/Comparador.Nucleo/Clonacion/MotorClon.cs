@@ -41,6 +41,19 @@ public static class MotorClon
             return Copiar(lectura, escritura, verificar, progreso, cancelacion);
         }, cancelacion);
 
+    /// <summary>Cuánto se va a escribir, si se sabe sin leerlo todo (una imagen .xz o .gz no lo dice hasta el final).</summary>
+    public static long? LargoDe(ExtremoClon origen, IReadOnlyList<DiscoFisico> discos)
+    {
+        if (origen.Tramo(discos) is { } tramo)
+        {
+            return tramo.Largo;
+        }
+
+        using var imagen = OrigenClon.DeImagen(((ExtremoClon.DeImagen)origen).Ruta);
+
+        return imagen.Largo;
+    }
+
     private static OrigenClon AbrirOrigen(ExtremoClon origen, IReadOnlyList<DiscoFisico> discos) => origen.Tramo(discos) is { } tramo
         ? OrigenClon.DeTramo(DiscoCrudo.AbrirLectura(tramo.Disco.Numero), tramo.Inicio, tramo.Largo)
         : OrigenClon.DeImagen(((ExtremoClon.DeImagen)origen).Ruta);
@@ -109,13 +122,13 @@ public static class MotorClon
     /// <summary>Cuatro avisos por segundo como mucho: con bloques de 4 MB y un SSD rápido serían cientos.</summary>
     private sealed class Informe(IProgress<AvanceClon>? progreso, Stopwatch reloj)
     {
-        private TimeSpan ultimo = TimeSpan.MinValue;
+        private TimeSpan? ultimo;
         private TimeSpan inicioFase;
 
         public void Reiniciar()
         {
             inicioFase = reloj.Elapsed;
-            ultimo = TimeSpan.MinValue;
+            ultimo = null;
         }
 
         public void Avisar(FaseClon fase, long hechos, long? total, double? fraccion)

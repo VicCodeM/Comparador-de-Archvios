@@ -20,6 +20,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args is ["clonar", var origen, var destino, ..])
+        {
+            Clonar(origen, destino, verificar: !e.Args.Contains("--sin-verificar"));
+            return;
+        }
+
         instancia = InstanciaUnica.Tomar(e.Args);
         if (instancia is null)
         {
@@ -40,6 +46,20 @@ public partial class App : Application
         {
             MostrarPrincipal();
         }
+    }
+
+    /// <summary>
+    /// El Espejo que se abre como administrador desde la página Clonar: solo su ventanita, sin la ventana principal ni
+    /// la cola de copias, y se cierra al cerrarla.
+    /// </summary>
+    private void Clonar(string origen, string destino, bool verificar)
+    {
+        Apariencia.Aplicar(Configuracion.Cargar().Tema);
+        MainWindow = new Vistas.VentanaClonado
+        {
+            DataContext = new ClonadoModeloVista(Nucleo.Clonacion.ExtremoClon.Interpretar(origen), Nucleo.Clonacion.ExtremoClon.Interpretar(destino), verificar),
+        };
+        MainWindow.Show();
     }
 
     /// <summary>Activa o quita el modo en segundo plano (Ctrl+V del Explorador, icono junto al reloj, arranque con Windows).</summary>

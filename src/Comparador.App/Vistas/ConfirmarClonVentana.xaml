@@ -1,0 +1,26 @@
+<ui:FluentWindow x:Class="Comparador.App.Vistas.ConfirmarClonVentana"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Confirmar clonado"
+                 Width="520" SizeToContent="Height" ResizeMode="NoResize"
+                 WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica">
+    <StackPanel>
+        <ui:TitleBar Title="Confirmar clonado" ShowMinimize="False" ShowMaximize="False" />
+        <StackPanel Margin="20,0,20,18">
+            <TextBlock x:Name="Resumen" TextWrapping="Wrap" FontSize="14" />
+            <StackPanel x:Name="PanelBorrar" Margin="0,14,0,0">
+                <ui:InfoBar Severity="Warning" IsOpen="True" IsClosable="False"
+                            Title="No se puede deshacer: el destino quedará igual que el origen." />
+                <TextBlock Margin="0,12,0,6" Text="Para seguir, escribe BORRAR:" />
+                <ui:TextBox x:Name="Confirmacion" TextChanged="AlEscribir" PlaceholderText="BORRAR" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <ui:Button Content="Cancelar" IsCancel="True" Margin="0,0,8,0" MinWidth="96" />
+                <ui:Button x:Name="BotonClonar" Content="Clonar" Appearance="Primary" MinWidth="96" Click="AlClonar" />
+            </StackPanel>
+            <TextBlock Text="Creado por Ing. Victor Maldonado - VMSofts" Margin="0,14,0,0" Style="{StaticResource TextoSecundario}" />
+        </StackPanel>
+    </StackPanel>
+</ui:FluentWindow>
