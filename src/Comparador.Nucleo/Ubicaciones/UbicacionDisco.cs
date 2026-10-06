@@ -43,6 +43,8 @@ public sealed class UbicacionDisco(string raiz) : IUbicacion
         }
     }
 
+    public bool ExisteArchivo(string relativa) => File.Exists(RutaIO(relativa));
+
     public IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa) =>
         new DirectoryInfo(RutaIO(relativa)).EnumerateFileSystemInfos("*", SoloEsteNivel).Select(info => Describir(relativa, info)).ToList();
 

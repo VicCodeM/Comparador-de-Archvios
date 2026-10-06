@@ -45,6 +45,7 @@ public sealed partial class EntradaMenu(Pagina pagina, string titulo, SymbolRegu
 public sealed partial class PrincipalModeloVista : ObservableObject
 {
     private CancellationTokenSource? cancelacion;
+    private ProgresoOperacion? enMarcha;
     private Configuracion config;
     private bool cargando;
 
@@ -58,6 +59,8 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [ObservableProperty] private bool hilosAutomaticos = true;
     [ObservableProperty] private double hilos = 4;
     [ObservableProperty] private bool evitarSuspension = true;
+    [ObservableProperty] private ReglaConflicto siYaExiste = ReglaConflicto.Reemplazar;
+    [ObservableProperty] private bool enPausa;
     [ObservableProperty] private bool copiaTerminada;
     [ObservableProperty] private string resumenCopia = string.Empty;
     [ObservableProperty] private InfoBarSeverity severidadCopia = InfoBarSeverity.Success;
@@ -168,6 +171,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         HilosAutomaticos = config.HilosAutomaticos;
         Hilos = config.Hilos;
         EvitarSuspension = config.EvitarSuspension;
+        SiYaExiste = config.SiYaExiste;
         CargarRecientes();
         if (Recientes.Count > 0)
         {
@@ -203,6 +207,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             HilosAutomaticos = HilosAutomaticos,
             Hilos = (int)Hilos,
             EvitarSuspension = EvitarSuspension,
+            SiYaExiste = SiYaExiste,
         };
         config.Guardar();
     }
@@ -218,6 +223,10 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     partial void OnVerificarCopiasChanged(bool value) => Guardar();
 
     partial void OnEvitarSuspensionChanged(bool value) => Guardar();
+
+    partial void OnSiYaExisteChanged(ReglaConflicto value) => Guardar();
+
+    public IReadOnlyList<ReglaConflicto> Reglas { get; } = Enum.GetValues<ReglaConflicto>();
 
     partial void OnHilosAutomaticosChanged(bool value)
     {
@@ -394,6 +403,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         }
 
         var progreso = new ProgresoOperacion();
+        enMarcha = progreso;
         Progreso.Seguir(progreso, Terminados);
         CopiaTerminada = false;
         OperacionActual = Operacion.Copiando;
@@ -404,13 +414,15 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
         try
         {
-            var resumen = await new SincronizadorArchivos().SincronizarAsync(
-                Revision.Todos, VerificarCopias, HilosAutomaticos ? null : (int)Hilos, progreso, cancelacion.Token);
+            var opciones = new OpcionesCopia
+            {
+                Verificar = VerificarCopias,
+                HilosManuales = HilosAutomaticos ? null : (int)Hilos,
+                SiYaExiste = SiYaExiste,
+            };
+            var resumen = await new SincronizadorArchivos().SincronizarAsync(Revision.Todos, opciones, progreso, cancelacion.Token);
             SeveridadCopia = resumen.Fallidos.IsEmpty ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
-            var copiados = Formatos.Cantidad(resumen.Copiados, "elemento copiado", "elementos copiados");
-            ResumenCopia = resumen.Fallidos.IsEmpty
-                ? $"{copiados} en {Formatos.Duracion(reloj.Elapsed)}" + (VerificarCopias ? ", verificados con SHA-256." : ".")
-                : $"{copiados}; {Formatos.Cantidad(resumen.Fallidos.Count, "falló", "fallaron")}. Abajo está el motivo de cada uno.";
+            ResumenCopia = DescribirResumen(resumen, reloj.Elapsed);
         }
         catch (OperationCanceledException)
         {
@@ -431,12 +443,58 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         }
     }
 
+    private string DescribirResumen(ResumenSincronizacion resumen, TimeSpan duracion)
+    {
+        var partes = new List<string> { Formatos.Cantidad(resumen.Copiados, "elemento copiado", "elementos copiados") };
+        if (resumen.Saltados > 0)
+        {
+            partes.Add(Formatos.Cantidad(resumen.Saltados, "saltado", "saltados"));
+        }
+
+        if (!resumen.Fallidos.IsEmpty)
+        {
+            partes.Add(Formatos.Cantidad(resumen.Fallidos.Count, "falló", "fallaron"));
+        }
+
+        var verificados = VerificarCopias && resumen.Copiados > 0 ? ", verificados con SHA-256" : string.Empty;
+
+        return $"{string.Join(", ", partes)} en {Formatos.Duracion(duracion)}{verificados}."
+            + (resumen.Fallidos.IsEmpty ? string.Empty : " Abajo está el motivo de cada uno.");
+    }
+
     private void Terminar()
     {
         cancelacion?.Dispose();
         cancelacion = null;
+        enMarcha = null;
+        EnPausa = false;
         OperacionActual = Operacion.Ninguna;
     }
+
+    /// <summary>Pausa o reanuda la copia: los hilos se detienen en el siguiente bloque, sin dejar nada a medias.</summary>
+    [RelayCommand]
+    private void PausarOReanudar()
+    {
+        if (enMarcha is null)
+        {
+            return;
+        }
+
+        if (enMarcha.Pausado)
+        {
+            enMarcha.Reanudar();
+        }
+        else
+        {
+            enMarcha.Pausar();
+        }
+
+        EnPausa = enMarcha.Pausado;
+    }
+
+    /// <summary>Deja de copiar ese archivo (el destino queda como estaba) y sigue con los demás.</summary>
+    [RelayCommand]
+    private void SaltarArchivo(FilaEnCurso? fila) => fila?.Archivo.Saltar();
 
     [RelayCommand]
     private void IrA(Pagina pagina) => PaginaActual = pagina;

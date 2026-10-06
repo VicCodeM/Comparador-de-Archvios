@@ -28,13 +28,24 @@ public static class CopiaNativa
     private static void Copiar(string origenIO, string destinoIO, bool sinCache, Action<long> alAvanzar, CancellationToken cancelacion)
     {
         long anteriores = 0;
+        Exception? falloEnAviso = null;
+        // Este aviso corre dentro de Windows: una excepción que salga de aquí cerraría el programa de golpe. Por eso
+        // cualquier falla (o un archivo saltado) se guarda, se le responde "cancelar" a Windows y se relanza después.
         CopyFile2ProgressRoutine aviso = (mensaje, _) =>
         {
-            if (Marshal.ReadInt32(mensaje) == MensajeBloqueTerminado)
+            try
             {
-                var transferidos = Marshal.ReadInt64(mensaje, DesplazamientoBytesTransferidos);
-                alAvanzar(transferidos - anteriores);
-                anteriores = transferidos;
+                if (Marshal.ReadInt32(mensaje) == MensajeBloqueTerminado)
+                {
+                    var transferidos = Marshal.ReadInt64(mensaje, DesplazamientoBytesTransferidos);
+                    alAvanzar(transferidos - anteriores);
+                    anteriores = transferidos;
+                }
+            }
+            catch (Exception error)
+            {
+                falloEnAviso = error;
+                return Cancelar;
             }
 
             return cancelacion.IsCancellationRequested ? Cancelar : Continuar;
@@ -48,6 +59,11 @@ public static class CopiaNativa
         };
         var resultado = CopyFile2(origenIO, destinoIO, ref parametros);
         GC.KeepAlive(aviso);
+        if (falloEnAviso is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(falloEnAviso);
+        }
+
         cancelacion.ThrowIfCancellationRequested();
         if (resultado < 0)
         {

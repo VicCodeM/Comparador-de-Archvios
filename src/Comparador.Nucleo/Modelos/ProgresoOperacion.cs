@@ -21,11 +21,27 @@ public sealed record InstantaneaProgreso(
     public bool TieneTotal => Total > 0 || BytesTotal > 0;
 }
 
-/// <summary>Un archivo que se está copiando o leyendo ahora mismo. Los hilos solo suman bytes; la ventana lo lee.</summary>
-public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string rutaOrigen, string rutaDestino)
+/// <summary>
+/// Un archivo que se está copiando o leyendo ahora mismo. Los hilos solo suman bytes; la ventana lo lee. Tiene su
+/// propia cancelación para poder saltarlo sin detener los demás.
+/// </summary>
+public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string rutaOrigen, string rutaDestino, CancellationToken operacion)
 {
+    private readonly CancellationTokenSource propia = CancellationTokenSource.CreateLinkedTokenSource(operacion);
     private long bytes;
     private long acumulado;
+
+    /// <summary>Se cancela si se cancela toda la operación o si se salta este archivo.</summary>
+    public CancellationToken Cancelacion => propia.Token;
+
+    /// <summary>El usuario pidió saltarlo (no es lo mismo que cancelar toda la copia).</summary>
+    public bool Saltado { get; private set; }
+
+    public void Saltar()
+    {
+        Saltado = true;
+        propia.Cancel();
+    }
 
     public string RutaRelativa { get; } = rutaRelativa;
 
@@ -60,8 +76,18 @@ public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string ruta
     }
 }
 
-/// <summary>Un archivo que ya terminó, bien o mal, con lo que pasó.</summary>
-public sealed record ArchivoTerminado(string RutaRelativa, string RutaOrigen, string RutaDestino, long Tamano, bool Exito, string Mensaje, DateTime Hora);
+public enum ResultadoArchivo
+{
+    Copiado,
+    Fallido,
+
+    /// <summary>No se copió a propósito: lo saltó el usuario, o ya existía y la regla decía no tocarlo.</summary>
+    Saltado,
+}
+
+/// <summary>Un archivo que ya terminó, con lo que pasó.</summary>
+public sealed record ArchivoTerminado(
+    string RutaRelativa, string RutaOrigen, string RutaDestino, long Tamano, ResultadoArchivo Resultado, string Mensaje, DateTime Hora);
 
 /// <summary>
 /// Progreso compartido entre el trabajo (que solo suma contadores, sin avisar a nadie) y la ventana (que lo lee
@@ -72,6 +98,7 @@ public sealed class ProgresoOperacion
     private readonly Stopwatch reloj = new();
     private readonly ConcurrentDictionary<ArchivoEnCurso, byte> enCurso = new();
     private readonly ConcurrentQueue<ArchivoTerminado> terminados = new();
+    private readonly ManualResetEventSlim sinPausa = new(initialState: true);
     private long total;
     private long procesados;
     private long bytesTotal;
@@ -81,6 +108,35 @@ public sealed class ProgresoOperacion
 
     /// <summary>Cuántos archivos se trabajan a la vez en esta operación, y por qué.</summary>
     public DecisionHilos Hilos { get; set; } = new(1, string.Empty);
+
+    public bool Pausado => !sinPausa.IsSet;
+
+    /// <summary>
+    /// Los hilos se detienen en el siguiente bloque que copien o lean (en cualquier camino: disco, red o teléfono), sin
+    /// soltar el archivo a medias. El reloj también se para, para que el tiempo transcurrido no cuente la pausa.
+    /// </summary>
+    public void Pausar()
+    {
+        sinPausa.Reset();
+        reloj.Stop();
+    }
+
+    public void Reanudar()
+    {
+        reloj.Start();
+        sinPausa.Set();
+    }
+
+    /// <summary>Antes de empezar cada archivo: si está en pausa, espera aquí.</summary>
+    public async Task EsperarSiPausadoAsync(CancellationToken cancelacion)
+    {
+        while (Pausado)
+        {
+            await Task.Delay(EsperaEnPausa, cancelacion);
+        }
+    }
+
+    private static readonly TimeSpan EsperaEnPausa = TimeSpan.FromMilliseconds(200);
 
     public void IniciarFase(string nombre, long totalElementos = 0, long totalBytes = 0)
     {
@@ -99,32 +155,43 @@ public sealed class ProgresoOperacion
 
     public void MarcarActual(string descripcion) => actual = descripcion;
 
-    public ArchivoEnCurso Empezar(string rutaRelativa, long tamano, string etapa, string rutaOrigen = "", string rutaDestino = "")
+    public ArchivoEnCurso Empezar(
+        string rutaRelativa, long tamano, string etapa, string rutaOrigen = "", string rutaDestino = "", CancellationToken cancelacion = default)
     {
-        var archivo = new ArchivoEnCurso(rutaRelativa, tamano, rutaOrigen, rutaDestino) { Etapa = etapa };
+        var archivo = new ArchivoEnCurso(rutaRelativa, tamano, rutaOrigen, rutaDestino, cancelacion) { Etapa = etapa };
         enCurso.TryAdd(archivo, 0);
         actual = rutaRelativa;
 
         return archivo;
     }
 
-    /// <summary>Suma bytes al archivo y al total de la operación.</summary>
+    /// <summary>
+    /// Suma bytes al archivo y al total. Se llama después de cada bloque en todos los caminos de copia y lectura, así
+    /// que es aquí donde la pausa detiene el trabajo y donde un archivo saltado deja de copiarse.
+    /// </summary>
     public void SumarBytes(ArchivoEnCurso archivo, long bytes)
     {
-        archivo.Sumar(bytes);
-        SumarBytes(bytes);
+        Contar(archivo, bytes);
+        sinPausa.Wait(archivo.Cancelacion);
+        archivo.Cancelacion.ThrowIfCancellationRequested();
     }
 
     /// <summary>
     /// Deja la aportación del archivo al total en lo que se esperaba de él. Un reintento o un fallo a la mitad no
     /// deben dejar la barra pasada del 100 % ni corta para siempre.
     /// </summary>
-    public void AjustarBytes(ArchivoEnCurso archivo, long esperados) => SumarBytes(archivo, esperados - archivo.Acumulado);
+    public void AjustarBytes(ArchivoEnCurso archivo, long esperados) => Contar(archivo, esperados - archivo.Acumulado);
 
-    public void Terminar(ArchivoEnCurso archivo, bool exito, string mensaje)
+    private void Contar(ArchivoEnCurso archivo, long bytes)
+    {
+        archivo.Sumar(bytes);
+        SumarBytes(bytes);
+    }
+
+    public void Terminar(ArchivoEnCurso archivo, ResultadoArchivo resultado, string mensaje)
     {
         enCurso.TryRemove(archivo, out _);
-        terminados.Enqueue(new ArchivoTerminado(archivo.RutaRelativa, archivo.RutaOrigen, archivo.RutaDestino, archivo.Tamano, exito, mensaje, DateTime.Now));
+        terminados.Enqueue(new ArchivoTerminado(archivo.RutaRelativa, archivo.RutaOrigen, archivo.RutaDestino, archivo.Tamano, resultado, mensaje, DateTime.Now));
         Avanzar();
     }
 

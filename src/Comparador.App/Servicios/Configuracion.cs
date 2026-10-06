@@ -39,6 +39,9 @@ public sealed record Configuracion
     /// <summary>Que Windows no se suspenda mientras se compara o se copia (se vuelve a permitir al terminar).</summary>
     public bool EvitarSuspension { get; init; } = true;
 
+    /// <summary>Qué hacer si el archivo ya existe en el destino y es distinto.</summary>
+    public ReglaConflicto SiYaExiste { get; init; } = ReglaConflicto.Reemplazar;
+
     private static readonly string Archivo = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VMSofts", "ComparadorArchivos", "configuracion.json");
 

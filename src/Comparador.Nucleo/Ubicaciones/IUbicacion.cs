@@ -35,6 +35,8 @@ public interface IUbicacion
 
     void CrearCarpeta(string relativa);
 
+    bool ExisteArchivo(string relativa);
+
     /// <summary>Lo que hay en una carpeta, sin entrar en subcarpetas. Lanza UnauthorizedAccessException si no hay permiso.</summary>
     IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa);
 

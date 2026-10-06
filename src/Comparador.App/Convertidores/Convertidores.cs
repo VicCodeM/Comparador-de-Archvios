@@ -104,3 +104,14 @@ public sealed class NoEsConverter : ConvertidorDeIda
 {
     public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
 }
+
+public sealed class ReglaTextoConverter : ConvertidorDeIda
+{
+    public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        ReglaConflicto.SoloSiEsMasNuevo => "Reemplazar solo si es más nuevo",
+        ReglaConflicto.Saltar => "No tocarlo (saltar)",
+        ReglaConflicto.ConservarAmbos => "Conservar los dos (renombrar)",
+        _ => "Reemplazarlo",
+    };
+}

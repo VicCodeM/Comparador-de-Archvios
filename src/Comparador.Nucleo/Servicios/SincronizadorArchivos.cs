@@ -7,19 +7,24 @@ namespace Comparador.Nucleo.Servicios;
 public sealed class ResumenSincronizacion
 {
     private int copiados;
+    private int saltados;
 
     public int Copiados => copiados;
+
+    public int Saltados => saltados;
 
     public ConcurrentBag<ElementoComparado> Fallidos { get; } = [];
 
     public void ContarCopiado() => Interlocked.Increment(ref copiados);
+
+    public void ContarSaltado() => Interlocked.Increment(ref saltados);
 }
 
 /// <summary>
-/// Copia lo que falta y reemplaza lo diferente. Las copias a la vez parten de <see cref="Concurrencia"/> y, en automático,
-/// las va ajustando <see cref="AjustadorHilos"/> según la velocidad que mide en este equipo.
-/// Cada elemento cambia SU estado al terminar; nada recorre la lista entera por cada archivo, que era lo que
-/// congelaba la versión anterior.
+/// Copia lo que falta y reemplaza lo diferente según la regla elegida. Las copias a la vez parten de
+/// <see cref="Concurrencia"/> y, en automático, las va ajustando <see cref="AjustadorHilos"/> según la velocidad que mide
+/// en este equipo. Se puede pausar, saltar un archivo o cancelar todo. Cada elemento cambia SU estado al terminar;
+/// nada recorre la lista entera por cada archivo, que era lo que congelaba la versión anterior.
 /// </summary>
 public sealed class SincronizadorArchivos
 {
@@ -27,33 +32,32 @@ public sealed class SincronizadorArchivos
     private static readonly TimeSpan TramoDeMedicion = TimeSpan.FromSeconds(1.5);
 
     public Task<ResumenSincronizacion> SincronizarAsync(
-        IReadOnlyList<ElementoComparado> elementos, bool verificar, int? hilosManuales, ProgresoOperacion progreso, CancellationToken cancelacion) =>
-        Task.Run(() => Sincronizar(elementos, verificar, hilosManuales, progreso, cancelacion), cancelacion);
+        IReadOnlyList<ElementoComparado> elementos, OpcionesCopia opciones, ProgresoOperacion progreso, CancellationToken cancelacion) =>
+        Task.Run(() => Sincronizar(elementos, opciones, progreso, cancelacion), cancelacion);
 
     private static async Task<ResumenSincronizacion> Sincronizar(
-        IReadOnlyList<ElementoComparado> elementos, bool verificar, int? hilosManuales, ProgresoOperacion progreso, CancellationToken cancelacion)
+        IReadOnlyList<ElementoComparado> elementos, OpcionesCopia opciones, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         var pendientes = elementos.Where(elemento => elemento.Seleccionado && elemento.SePuedeSincronizar).ToList();
         var archivos = pendientes.Where(elemento => !elemento.EsCarpeta).ToList();
         var ubicaciones = pendientes.Select(elemento => elemento.Par).Distinct()
             .ToDictionary(par => par, par => (Origen: CatalogoUbicaciones.Abrir(par.Origen), Destino: CatalogoUbicaciones.Abrir(par.Destino)));
-        progreso.Hilos = Concurrencia.Decidir(hilosManuales, ubicaciones.Values.SelectMany(par => new[] { par.Origen, par.Destino }));
-        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], verificar)));
+        progreso.Hilos = Concurrencia.Decidir(opciones.HilosManuales, ubicaciones.Values.SelectMany(par => new[] { par.Origen, par.Destino }));
+        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], opciones.Verificar)));
         var resumen = new ResumenSincronizacion();
         CrearCarpetas(pendientes.Where(elemento => elemento.EsCarpeta), ubicaciones, progreso, resumen, cancelacion);
         var limite = new LimiteDinamico(progreso.Hilos.Hilos);
         using var finAjuste = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
         var ajuste = progreso.Hilos.SeAjusta ? AjustarMientrasCopiaAsync(limite, progreso, finAjuste.Token) : Task.CompletedTask;
-        var opciones = new ParallelOptions { MaxDegreeOfParallelism = Concurrencia.Maximo, CancellationToken = cancelacion };
+        var paralelo = new ParallelOptions { MaxDegreeOfParallelism = Concurrencia.Maximo, CancellationToken = cancelacion };
         try
         {
-            await Parallel.ForEachAsync(archivos, opciones, async (archivo, token) =>
+            await Parallel.ForEachAsync(archivos, paralelo, async (archivo, token) =>
             {
                 await limite.EsperarAsync(token);
                 try
                 {
-                    var (origen, destino) = ubicaciones[archivo.Par];
-                    await CopiarAsync(archivo, origen, destino, verificar, progreso, resumen, token);
+                    await CopiarAsync(archivo, ubicaciones[archivo.Par], opciones, progreso, resumen, token);
                 }
                 finally
                 {
@@ -81,6 +85,13 @@ public sealed class SincronizadorArchivos
             while (await reloj.WaitForNextTickAsync(fin))
             {
                 var actual = progreso.Instantanea();
+                if (progreso.Pausado)
+                {
+                    // En pausa no se avanza: medir ahora haría creer al ajustador que todo va lentísimo.
+                    anterior = actual;
+                    continue;
+                }
+
                 var hilos = ajustador.Medir(
                     actual.BytesProcesados - anterior.BytesProcesados, actual.Procesados - anterior.Procesados, actual.Transcurrido - anterior.Transcurrido);
                 progreso.Hilos = progreso.Hilos with { Hilos = hilos };
@@ -107,28 +118,48 @@ public sealed class SincronizadorArchivos
             try
             {
                 ubicaciones[carpeta.Par].Destino.CrearCarpeta(carpeta.RutaRelativa);
-                MarcarSincronizado(carpeta, "Carpeta creada", resumen);
-                progreso.Terminar(archivo, exito: true, carpeta.Motivo);
+                MarcarCopiado(carpeta, "Carpeta creada", resumen);
+                progreso.Terminar(archivo, ResultadoArchivo.Copiado, carpeta.Motivo);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
             {
                 MarcarFallido(carpeta, error, resumen);
-                progreso.Terminar(archivo, exito: false, carpeta.Motivo);
+                progreso.Terminar(archivo, ResultadoArchivo.Fallido, carpeta.Motivo);
             }
         }
     }
 
     private static async Task CopiarAsync(
-        ElementoComparado elemento, IUbicacion origen, IUbicacion destino, bool verificar,
+        ElementoComparado elemento, (IUbicacion Origen, IUbicacion Destino) par, OpcionesCopia opciones,
         ProgresoOperacion progreso, ResumenSincronizacion resumen, CancellationToken cancelacion)
     {
-        var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando", elemento.RutaOrigen, elemento.RutaDestino);
-        var exito = false;
+        var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando", elemento.RutaOrigen, elemento.RutaDestino, cancelacion);
+        var resultado = ResultadoArchivo.Fallido;
         try
         {
-            await CopiaSegura.CopiarAsync(origen, destino, elemento.RutaRelativa, verificar, archivo, progreso, cancelacion);
-            MarcarSincronizado(elemento, verificar ? "Copiado y verificado (SHA-256)" : "Copiado", resumen);
-            exito = true;
+            // En pausa el archivo ya figura en curso (y se puede saltar desde la lista) pero no empieza a copiarse.
+            archivo.Etapa = "En pausa";
+            await progreso.EsperarSiPausadoAsync(archivo.Cancelacion);
+            archivo.Etapa = "Copiando";
+            if (MotivoParaNoTocar(elemento, opciones.SiYaExiste) is { } motivo)
+            {
+                MarcarSaltado(elemento, motivo, resumen);
+                resultado = ResultadoArchivo.Saltado;
+                return;
+            }
+
+            var relativaDestino = opciones.SiYaExiste == ReglaConflicto.ConservarAmbos && elemento.Estado == EstadoElemento.Diferente
+                ? NombreLibre(par.Destino, elemento.RutaRelativa)
+                : elemento.RutaRelativa;
+            await CopiaSegura.CopiarAsync(par.Origen, par.Destino, elemento.RutaRelativa, relativaDestino, opciones.Verificar, archivo, progreso, archivo.Cancelacion);
+            var hecho = opciones.Verificar ? "Copiado y verificado (SHA-256)" : "Copiado";
+            MarcarCopiado(elemento, relativaDestino == elemento.RutaRelativa ? hecho : $"{hecho} como {Path.GetFileName(relativaDestino)}", resumen);
+            resultado = ResultadoArchivo.Copiado;
+        }
+        catch (OperationCanceledException) when (archivo.Saltado && !cancelacion.IsCancellationRequested)
+        {
+            MarcarSaltado(elemento, "Saltado: lo pediste durante la copia (el destino quedó como estaba)", resumen);
+            resultado = ResultadoArchivo.Saltado;
         }
         catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
         {
@@ -141,17 +172,58 @@ public sealed class SincronizadorArchivos
         }
         finally
         {
-            progreso.AjustarBytes(archivo, BytesEsperados(elemento, (origen, destino), verificar));
-            progreso.Terminar(archivo, exito, cancelacion.IsCancellationRequested && !exito ? "Cancelado" : elemento.Motivo);
+            progreso.AjustarBytes(archivo, BytesEsperados(elemento, par, opciones.Verificar));
+            progreso.Terminar(archivo, resultado, cancelacion.IsCancellationRequested && resultado == ResultadoArchivo.Fallido ? "Cancelado" : elemento.Motivo);
         }
     }
 
-    private static void MarcarSincronizado(ElementoComparado elemento, string motivo, ResumenSincronizacion resumen)
+    /// <summary>Por qué un archivo que ya existe no se toca según la regla elegida, o null si hay que copiarlo.</summary>
+    private static string? MotivoParaNoTocar(ElementoComparado elemento, ReglaConflicto regla)
+    {
+        if (elemento.Estado != EstadoElemento.Diferente)
+        {
+            return null;
+        }
+
+        return regla switch
+        {
+            ReglaConflicto.Saltar => "Saltado: ya existía en el destino y se eligió no reemplazar",
+            ReglaConflicto.SoloSiEsMasNuevo when elemento.FechaOrigen <= elemento.FechaDestino =>
+                "Saltado: el del destino es igual o más nuevo",
+            _ => null,
+        };
+    }
+
+    /// <summary>"foto.jpg" → "foto (2).jpg", "foto (3).jpg"... el primero que no exista en el destino.</summary>
+    public static string NombreLibre(IUbicacion destino, string relativa)
+    {
+        var carpeta = Path.GetDirectoryName(relativa) ?? string.Empty;
+        var nombre = Path.GetFileNameWithoutExtension(relativa);
+        var extension = Path.GetExtension(relativa);
+        for (var numero = 2; ; numero++)
+        {
+            var candidato = Path.Combine(carpeta, $"{nombre} ({numero}){extension}");
+            if (!destino.ExisteArchivo(candidato))
+            {
+                return candidato;
+            }
+        }
+    }
+
+    private static void MarcarCopiado(ElementoComparado elemento, string motivo, ResumenSincronizacion resumen)
     {
         elemento.Estado = EstadoElemento.Coincide;
         elemento.Seleccionado = false;
         elemento.Motivo = motivo;
         resumen.ContarCopiado();
+    }
+
+    /// <summary>No se copió a propósito: deja de estar marcado (no se reintenta) pero conserva su estado real.</summary>
+    private static void MarcarSaltado(ElementoComparado elemento, string motivo, ResumenSincronizacion resumen)
+    {
+        elemento.Seleccionado = false;
+        elemento.Motivo = motivo;
+        resumen.ContarSaltado();
     }
 
     private static void MarcarFallido(ElementoComparado elemento, Exception error, ResumenSincronizacion resumen)

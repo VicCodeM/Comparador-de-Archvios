@@ -55,7 +55,7 @@ async Task CopiarConMotor(bool verificar)
     var progreso = new ProgresoOperacion();
     using var fin = new CancellationTokenSource();
     var vigilancia = VigilarHilosAsync(progreso, fin.Token);
-    var resumen = await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar, null, progreso, CancellationToken.None);
+    var resumen = await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, new OpcionesCopia { Verificar = verificar }, progreso, CancellationToken.None);
     await fin.CancelAsync();
     await vigilancia;
     foreach (var fallido in resumen.Fallidos.Take(10))

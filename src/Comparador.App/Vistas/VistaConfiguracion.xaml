@@ -18,6 +18,23 @@
                 <ui:ToggleSwitch IsChecked="{Binding VerificarCopias}" />
             </ui:CardControl>
 
+            <ui:CardControl Icon="{ui:SymbolIcon DocumentCopy24}" Margin="0,0,0,4">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Si el archivo ya existe en el destino" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap"
+                                   Text="Qué hacer cuando en el destino hay un archivo con el mismo nombre pero distinto." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ComboBox ItemsSource="{Binding Reglas}" SelectedItem="{Binding SiYaExiste}" Width="260">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource ReglaTexto}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </ui:CardControl>
+
             <ui:CardControl Icon="{ui:SymbolIcon WeatherMoon24}" Margin="0,0,0,4">
                 <ui:CardControl.Header>
                     <StackPanel>

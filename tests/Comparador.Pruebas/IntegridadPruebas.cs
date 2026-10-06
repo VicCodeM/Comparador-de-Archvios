@@ -19,6 +19,8 @@ internal sealed class DestinoQueCorrompe(string raiz) : IUbicacion
 
     public void CrearCarpeta(string relativa) => disco.CrearCarpeta(relativa);
 
+    public bool ExisteArchivo(string relativa) => disco.ExisteArchivo(relativa);
+
     public IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa) => disco.ListarCarpeta(relativa);
 
     public Stream AbrirLectura(string relativa) => disco.AbrirLectura(relativa);
@@ -50,7 +52,7 @@ public sealed class IntegridadPruebas : IDisposable
         var progreso = new ProgresoOperacion();
         var archivo = progreso.Empezar(relativa, 0, "Copiando");
 
-        return CopiaSegura.CopiarAsync(new UbicacionDisco(carpetas.Origen), destino, relativa, verificar, archivo, progreso, CancellationToken.None);
+        return CopiaSegura.CopiarAsync(new UbicacionDisco(carpetas.Origen), destino, relativa, relativa, verificar, archivo, progreso, CancellationToken.None);
     }
 
     [Fact]
@@ -98,11 +100,11 @@ public sealed class IntegridadPruebas : IDisposable
             [new ParRutas(carpetas.Origen, carpetas.Destino)], new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
         var progreso = new ProgresoOperacion();
 
-        await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, verificar: true, hilosManuales: 2, progreso, CancellationToken.None);
+        await new SincronizadorArchivos().SincronizarAsync(resultado.Elementos, new OpcionesCopia { HilosManuales = 2 }, progreso, CancellationToken.None);
 
         var foto = progreso.Instantanea();
         Assert.Equal(foto.BytesTotal, foto.BytesProcesados);
-        Assert.Equal(2, progreso.TomarTerminados().Count(t => t.Exito));
+        Assert.Equal(2, progreso.TomarTerminados().Count(t => t.Resultado == ResultadoArchivo.Copiado));
         Assert.Empty(progreso.EnCurso());
     }
 }
@@ -116,6 +118,7 @@ public sealed class ConcurrenciaPruebas
         public bool FechasFiables => true;
         public bool Existe() => true;
         public void CrearCarpeta(string relativa) => throw new NotSupportedException();
+        public bool ExisteArchivo(string relativa) => throw new NotSupportedException();
         public IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa) => throw new NotSupportedException();
         public Stream AbrirLectura(string relativa) => throw new NotSupportedException();
         public MetadatosArchivo LeerMetadatos(string relativa) => throw new NotSupportedException();

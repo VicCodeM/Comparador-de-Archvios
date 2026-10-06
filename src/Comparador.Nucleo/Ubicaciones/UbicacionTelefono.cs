@@ -56,6 +56,8 @@ public sealed class UbicacionTelefono : IUbicacion
         }
     });
 
+    public bool ExisteArchivo(string relativa) => EnTurno(() => dispositivo.FileExists(Completa(relativa)));
+
     public IReadOnlyList<EntradaEscaneada> ListarCarpeta(string relativa) => EnTurno(() =>
         dispositivo.GetDirectoryInfo(Completa(relativa)).EnumerateFileSystemInfos().Select(info => Describir(relativa, info)).ToList());
 

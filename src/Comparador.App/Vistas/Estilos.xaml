@@ -15,6 +15,7 @@
     <conv:TipoIconoConverter x:Key="TipoIcono" />
     <conv:EnumMarcadoConverter x:Key="EnumMarcado" />
     <conv:NoEsConverter x:Key="NoEs" />
+    <conv:ReglaTextoConverter x:Key="ReglaTexto" />
 
     <!-- Título de página, como "Inicio" en PowerToys -->
     <Style x:Key="TituloPagina" TargetType="TextBlock">
@@ -133,9 +134,13 @@
         <Setter Property="Symbol" Value="CheckmarkCircle24" />
         <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
         <Style.Triggers>
-            <DataTrigger Binding="{Binding Exito}" Value="False">
+            <DataTrigger Binding="{Binding Resultado}" Value="{x:Static nucleo:ResultadoArchivo.Fallido}">
                 <Setter Property="Symbol" Value="DismissCircle24" />
                 <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Resultado}" Value="{x:Static nucleo:ResultadoArchivo.Saltado}">
+                <Setter Property="Symbol" Value="ArrowForward24" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -175,7 +180,14 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="{Binding Nombre}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-            <TextBlock Grid.Column="1" Text="{Binding Etapa}" Margin="12,0,0,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                <TextBlock Text="{Binding Etapa}" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                <ui:Button Content="Saltar" Margin="10,0,0,0" Padding="10,2" FontSize="12" Appearance="Transparent"
+                           ToolTip="Deja este archivo como estaba en el destino y sigue con los demás"
+                           Command="{Binding DataContext.SaltarArchivoCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                           CommandParameter="{Binding}"
+                           Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolAVisible}}" />
+            </StackPanel>
             <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6" Value="{Binding Porcentaje, Mode=OneWay}" Maximum="100" />
             <TextBlock Grid.Row="2" Text="{Binding Carpeta}" Style="{StaticResource TextoSecundario}" />
             <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Avance}" Margin="12,0,0,0" Style="{StaticResource TextoSecundario}" />

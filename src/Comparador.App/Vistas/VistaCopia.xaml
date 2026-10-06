@@ -14,8 +14,14 @@
 
         <!-- Avance (mientras copia) o resumen (al terminar) -->
         <StackPanel Margin="40,28,40,0">
-            <TextBlock Text="Copiando" Style="{StaticResource TituloPagina}"
-                       Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
+            <StackPanel Orientation="Horizontal" Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}">
+                <TextBlock Text="Copiando" Style="{StaticResource TituloPagina}" />
+                <Border Margin="14,4,0,20" Padding="10,3" CornerRadius="4" VerticalAlignment="Center"
+                        Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                        Visibility="{Binding EnPausa, Converter={StaticResource BoolAVisible}}">
+                    <TextBlock Text="En pausa" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                </Border>
+            </StackPanel>
             <TextBlock Text="Copia terminada" Style="{StaticResource TituloPagina}"
                        Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
             <vistas:PanelProgreso DataContext="{Binding Progreso}"
@@ -46,6 +52,9 @@
                 </ToggleButton>
                 <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=Copiados}">
                     <TextBlock><Run Text="Copiados " /><Run Text="{Binding Correctos, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
+                </ToggleButton>
+                <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=Saltados}">
+                    <TextBlock><Run Text="Saltados " /><Run Text="{Binding Saltados, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
                 </ToggleButton>
                 <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Filtro, Converter={StaticResource EnumMarcado}, ConverterParameter=ConError}">
                     <TextBlock><Run Text="Con error " /><Run Text="{Binding Fallidos, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
@@ -95,8 +104,38 @@
             <Grid>
                 <TextBlock VerticalAlignment="Center" Style="{StaticResource TextoSecundario}"
                            Text="Doble clic abre la copia. Clic derecho para más opciones." />
-                <ui:Button HorizontalAlignment="Right" Content="Cancelar" Command="{Binding CancelarCommand}" Icon="{ui:SymbolIcon Stop24}"
-                           Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}">
+                    <ui:Button Command="{Binding PausarOReanudarCommand}" Margin="0,0,8,0" MinWidth="120">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Margin="0,0,8,0">
+                                <ui:SymbolIcon.Style>
+                                    <Style TargetType="ui:SymbolIcon">
+                                        <Setter Property="Symbol" Value="Pause24" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EnPausa}" Value="True">
+                                                <Setter Property="Symbol" Value="Play24" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:SymbolIcon.Style>
+                            </ui:SymbolIcon>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Pausar" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EnPausa}" Value="True">
+                                                <Setter Property="Text" Value="Reanudar" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button Content="Cancelar" Command="{Binding CancelarCommand}" Icon="{ui:SymbolIcon Stop24}" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
                     <ui:Button Content="Reintentar los que fallaron" Command="{Binding ReintentarFallidosCommand}" Icon="{ui:SymbolIcon ArrowClockwise24}"

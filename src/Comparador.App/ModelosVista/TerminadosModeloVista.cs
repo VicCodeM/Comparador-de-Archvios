@@ -11,12 +11,13 @@ public enum FiltroTerminados
 {
     Todos,
     Copiados,
+    Saltados,
     ConError,
 }
 
 /// <summary>Un archivo terminado, como se ve en la lista.</summary>
 public sealed record FilaTerminada(
-    string Nombre, string Carpeta, string RutaOrigen, string RutaDestino, string Tamano, bool Exito, string Mensaje, string Hora)
+    string Nombre, string Carpeta, string RutaOrigen, string RutaDestino, string Tamano, ResultadoArchivo Resultado, string Mensaje, string Hora)
 {
     public static FilaTerminada Desde(ArchivoTerminado terminado) => new(
         Path.GetFileName(terminado.RutaRelativa),
@@ -24,7 +25,7 @@ public sealed record FilaTerminada(
         terminado.RutaOrigen,
         terminado.RutaDestino,
         terminado.Tamano > 0 ? Formatos.Tamano(terminado.Tamano) : string.Empty,
-        terminado.Exito,
+        terminado.Resultado,
         terminado.Mensaje,
         terminado.Hora.ToString("HH:mm:ss"));
 }
@@ -44,9 +45,10 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
     [ObservableProperty] private FiltroTerminados filtro = FiltroTerminados.Todos;
     [ObservableProperty] private string busqueda = string.Empty;
     [ObservableProperty] private int correctos;
+    [ObservableProperty] private int saltados;
     [ObservableProperty] private int fallidos;
 
-    public int Total => Correctos + Fallidos;
+    public int Total => Correctos + Saltados + Fallidos;
 
     public bool EnVivo => enVivo;
 
@@ -54,6 +56,7 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
     {
         todos.Clear();
         Correctos = 0;
+        Saltados = 0;
         Fallidos = 0;
         Filtro = FiltroTerminados.Todos;
         Busqueda = string.Empty;
@@ -69,8 +72,9 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
         }
 
         todos.AddRange(lote.Select(FilaTerminada.Desde));
-        Correctos += lote.Count(terminado => terminado.Exito);
-        Fallidos += lote.Count(terminado => !terminado.Exito);
+        Correctos += lote.Count(terminado => terminado.Resultado == ResultadoArchivo.Copiado);
+        Saltados += lote.Count(terminado => terminado.Resultado == ResultadoArchivo.Saltado);
+        Fallidos += lote.Count(terminado => terminado.Resultado == ResultadoArchivo.Fallido);
         Refrescar();
     }
 
@@ -83,6 +87,8 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
     partial void OnCorrectosChanged(int value) => OnPropertyChanged(nameof(Total));
 
     partial void OnFallidosChanged(int value) => OnPropertyChanged(nameof(Total));
+
+    partial void OnSaltadosChanged(int value) => OnPropertyChanged(nameof(Total));
 
     partial void OnFiltroChanged(FiltroTerminados value) => Refrescar();
 
@@ -103,8 +109,9 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
 
     private bool CumpleFiltro(FilaTerminada fila) => Filtro switch
     {
-        FiltroTerminados.Copiados => fila.Exito,
-        FiltroTerminados.ConError => !fila.Exito,
+        FiltroTerminados.Copiados => fila.Resultado == ResultadoArchivo.Copiado,
+        FiltroTerminados.Saltados => fila.Resultado == ResultadoArchivo.Saltado,
+        FiltroTerminados.ConError => fila.Resultado == ResultadoArchivo.Fallido,
         _ => true,
     };
 

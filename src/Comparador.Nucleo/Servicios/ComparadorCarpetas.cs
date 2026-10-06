@@ -200,7 +200,7 @@ public sealed class ComparadorCarpetas
             (elemento.Estado, elemento.Motivo) = await CompararHuellasAsync(elemento, archivo, progreso, token);
             elemento.Seleccionado = true;
             progreso.AjustarBytes(archivo, 2 * elemento.TamanoACopiar);
-            progreso.Terminar(archivo, elemento.Estado != EstadoElemento.Error, elemento.Motivo);
+            progreso.Terminar(archivo, elemento.Estado == EstadoElemento.Error ? ResultadoArchivo.Fallido : ResultadoArchivo.Copiado, elemento.Motivo);
         });
     }
 

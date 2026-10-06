@@ -28,25 +28,27 @@ public static class CopiaSegura
     private const int HResultEnUso = unchecked((int)0x80070020);
     private const int HResultBloqueoParcial = unchecked((int)0x80070021);
 
+    /// <param name="relativa">El archivo en el origen.</param>
+    /// <param name="relativaDestino">Dónde queda en el destino: casi siempre la misma ruta, o "nombre (2).ext" si se conservan los dos.</param>
     public static async Task CopiarAsync(
-        IUbicacion origen, IUbicacion destino, string relativa, bool verificar,
+        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, bool verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         for (var intento = 1; ; intento++)
         {
             try
             {
-                await IntentarCopiarAsync(origen, destino, relativa, verificar, archivo, progreso, cancelacion);
+                await IntentarCopiarAsync(origen, destino, relativa, relativaDestino, verificar, archivo, progreso, cancelacion);
                 return;
             }
-            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa) && intento < Reintentos)
+            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa, relativaDestino) && intento < Reintentos)
             {
                 archivo.Reiniciar($"En uso, reintento {intento + 1} de {Reintentos}");
                 await Task.Delay(TimeSpan.FromMilliseconds(500 * intento), cancelacion);
             }
-            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa))
+            catch (Exception error) when (EstaEnUso(error, origen, destino, relativa, relativaDestino))
             {
-                throw new ArchivoEnUsoException(DetectorBloqueos.Describir(RutaLocal(origen, relativa), RutaLocal(destino, relativa)), error);
+                throw new ArchivoEnUsoException(DetectorBloqueos.Describir(RutaLocal(origen, relativa), RutaLocal(destino, relativaDestino)), error);
             }
         }
     }
@@ -55,10 +57,10 @@ public static class CopiaSegura
     /// Reemplazar un archivo que otro programa tiene abierto NO da "en uso": Windows responde "acceso denegado".
     /// Por eso, ante un acceso denegado se pregunta a Windows si alguien lo tiene abierto antes de culpar a los permisos.
     /// </summary>
-    private static bool EstaEnUso(Exception error, IUbicacion origen, IUbicacion destino, string relativa) => error switch
+    private static bool EstaEnUso(Exception error, IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino) => error switch
     {
         IOException io => io.HResult is HResultEnUso or HResultBloqueoParcial,
-        UnauthorizedAccessException => DetectorBloqueos.QuienLoUsa(RutaLocal(destino, relativa)).Count > 0
+        UnauthorizedAccessException => DetectorBloqueos.QuienLoUsa(RutaLocal(destino, relativaDestino)).Count > 0
             || DetectorBloqueos.QuienLoUsa(RutaLocal(origen, relativa)).Count > 0,
         _ => false,
     };
@@ -77,11 +79,11 @@ public static class CopiaSegura
         origen is UbicacionDisco discoOrigen && destino is UbicacionDisco discoDestino ? (discoOrigen, discoDestino) : null;
 
     private static async Task IntentarCopiarAsync(
-        IUbicacion origen, IUbicacion destino, string relativa, bool verificar,
+        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, bool verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
-        var temporal = relativa + ExtensionTemporal;
-        destino.CrearCarpeta(Path.GetDirectoryName(relativa) ?? string.Empty);
+        var temporal = relativaDestino + ExtensionTemporal;
+        destino.CrearCarpeta(Path.GetDirectoryName(relativaDestino) ?? string.Empty);
         try
         {
             archivo.Reiniciar("Copiando");
@@ -89,12 +91,12 @@ public static class CopiaSegura
             {
                 await CopiarEntreDiscosAsync(discos.Origen, discos.Destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
                 // La copia de Windows ya trae fechas y atributos: volver a leerlos y ponerlos solo costaría tiempo por archivo.
-                destino.Reemplazar(temporal, relativa, MetadatosArchivo.YaCopiados);
+                destino.Reemplazar(temporal, relativaDestino, MetadatosArchivo.YaCopiados);
             }
             else
             {
                 await CopiarPorFlujoAsync(origen, destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
-                destino.Reemplazar(temporal, relativa, origen.LeerMetadatos(relativa));
+                destino.Reemplazar(temporal, relativaDestino, origen.LeerMetadatos(relativa));
             }
         }
         catch
