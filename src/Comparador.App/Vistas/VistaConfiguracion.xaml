@@ -79,7 +79,7 @@
                     <StackPanel>
                         <TextBlock Text="Copiar y mover desde el clic derecho" FontSize="14" />
                         <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
-                                   Text="Agrega &quot;Pegar aquí con Comparador&quot; (pega lo copiado con Ctrl+C, o mueve lo cortado con Ctrl+X) y &quot;Copiar / Mover con Comparador a...&quot;. Cada copia abre su ventanita, y si ya hay una en marcha, espera en cola. En Windows 11 están en &quot;Mostrar más opciones&quot;." />
+                                   Text="Agrega &quot;Pegar aquí con Espejo&quot; (pega lo copiado con Ctrl+C, o mueve lo cortado con Ctrl+X) y &quot;Copiar / Mover con Espejo a...&quot;. Cada copia abre su ventanita, y si ya hay una en marcha, espera en cola. En Windows 11 están en &quot;Mostrar más opciones&quot;." />
                     </StackPanel>
                 </ui:CardControl.Header>
                 <ui:ToggleSwitch IsChecked="{Binding IntegradoExplorador}" />
@@ -120,7 +120,8 @@
             <TextBlock Text="Acerca de" Style="{StaticResource TituloSeccion}" />
             <Border Style="{StaticResource Tarjeta}">
                 <StackPanel>
-                    <TextBlock Text="Comparador de Archivos" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="Espejo" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="Comparador y clonador" Style="{StaticResource TextoSecundario}" />
                     <TextBlock Text="{Binding Version}" Style="{StaticResource TextoSecundario}" Margin="0,2,0,8" />
                     <TextBlock Text="Compara y copia entre discos, memorias USB, carpetas de red y teléfonos, sin dejar archivos a medias."
                                TextWrapping="Wrap" Style="{StaticResource TextoSecundario}" />

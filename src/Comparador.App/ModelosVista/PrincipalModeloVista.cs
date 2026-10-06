@@ -235,7 +235,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             if (value)
             {
                 IntegracionExplorador.Instalar();
-                Avisos.Exito("Listo: en el clic derecho del Explorador (en Windows 11, en \"Mostrar más opciones\") ya está el Comparador");
+                Avisos.Exito("Listo: en el clic derecho del Explorador (en Windows 11, en \"Mostrar más opciones\") ya está Espejo");
             }
             else
             {

@@ -4,7 +4,7 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:mv="clr-namespace:Comparador.App.ModelosVista"
                  xmlns:vistas="clr-namespace:Comparador.App.Vistas"
-                 Title="Comparador de Archivos"
+                 Title="Espejo - Comparador y clonador"
                  Width="1280" Height="820" MinWidth="980" MinHeight="640"
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True"
@@ -23,7 +23,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Title="Comparador de Archivos">
+        <ui:TitleBar Title="Espejo - Comparador y clonador">
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/app.ico" />
             </ui:TitleBar.Icon>

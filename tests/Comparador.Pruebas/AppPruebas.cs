@@ -37,7 +37,7 @@ public sealed class AppPruebas
     {
         // Raíz aparte: la prueba no debe tocar el menú real (antes lo reescribía apuntando a testhost.exe).
         const string raiz = @"Software\Comparador.Pruebas\Classes";
-        const string ejecutable = @"C:\Programas\Comparador\Comparador.App.exe";
+        const string ejecutable = @"C:\Programas\Espejo\Espejo.exe";
         try
         {
             IntegracionExplorador.Instalar(raiz, ejecutable);

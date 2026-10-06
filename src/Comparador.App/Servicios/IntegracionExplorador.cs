@@ -15,12 +15,12 @@ public static class IntegracionExplorador
 
     private static IEnumerable<Verbo> Verbos() =>
     [
-        new(@"Directory\Background", "Pegar", "Pegar aquí con Comparador", "pegar \"%V\""),
-        new("Directory", "Pegar", "Pegar dentro con Comparador", "pegar \"%1\""),
-        new("*", "CopiarA", "Copiar con Comparador a...", "copiar \"%1\""),
-        new("Directory", "CopiarA", "Copiar con Comparador a...", "copiar \"%1\""),
-        new("*", "MoverA", "Mover con Comparador a...", "mover \"%1\""),
-        new("Directory", "MoverA", "Mover con Comparador a...", "mover \"%1\""),
+        new(@"Directory\Background", "Pegar", "Pegar aquí con Espejo", "pegar \"%V\""),
+        new("Directory", "Pegar", "Pegar dentro con Espejo", "pegar \"%1\""),
+        new("*", "CopiarA", "Copiar con Espejo a...", "copiar \"%1\""),
+        new("Directory", "CopiarA", "Copiar con Espejo a...", "copiar \"%1\""),
+        new("*", "MoverA", "Mover con Espejo a...", "mover \"%1\""),
+        new("Directory", "MoverA", "Mover con Espejo a...", "mover \"%1\""),
     ];
 
     private static string RutaVerbo(string raiz, Verbo verbo) => $@"{raiz}\{verbo.Clase}\shell\{Prefijo}{verbo.Clave}";
