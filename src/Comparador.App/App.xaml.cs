@@ -79,15 +79,27 @@ public partial class App : Application
 
     private void MostrarPrincipal()
     {
-        if (MainWindow is MainWindow { IsLoaded: true } principal)
+        if (MainWindow is not MainWindow { IsLoaded: true } principal)
         {
-            principal.WindowState = principal.WindowState == WindowState.Minimized ? WindowState.Normal : principal.WindowState;
-            principal.Activate();
-            return;
+            principal = new MainWindow();
+            MainWindow = principal;
+            principal.Show();
         }
 
-        MainWindow = new MainWindow();
-        MainWindow.Show();
+        principal.WindowState = principal.WindowState == WindowState.Minimized ? WindowState.Normal : principal.WindowState;
+        TraerAlFrente(principal);
+    }
+
+    /// <summary>
+    /// Desde segundo plano Windows no deja ponerse delante con Activate: la ventana quedaba detrás de las demás.
+    /// Subirla un instante por encima de todo la trae al frente sin dejarla fija ahí.
+    /// </summary>
+    private static void TraerAlFrente(Window ventana)
+    {
+        ventana.Topmost = true;
+        ventana.Activate();
+        ventana.Topmost = false;
+        ventana.Focus();
     }
 
     /// <summary>Suelta los teléfonos al salir: si no, Windows los deja "ocupados" hasta desconectarlos.</summary>

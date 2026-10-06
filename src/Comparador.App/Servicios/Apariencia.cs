@@ -11,11 +11,13 @@ public static class Apariencia
 
     public static void Aplicar(TemaApp tema)
     {
-        if (vigilada is not null)
+        // En segundo plano la ventana se cierra y se vuelve a abrir: la cerrada ya no se puede soltar (Wpf.Ui lanza).
+        if (vigilada is { IsLoaded: true })
         {
             SystemThemeWatcher.UnWatch(vigilada);
-            vigilada = null;
         }
+
+        vigilada = null;
 
         if (tema == TemaApp.Sistema)
         {
