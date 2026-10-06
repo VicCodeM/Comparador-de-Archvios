@@ -66,10 +66,10 @@ public static class DetectorDiscos
 {
     private const uint ConsultarPropiedad = 0x2D1400;
     private const uint ExtensionesDeVolumen = 0x560000;
-    private const int PropiedadDispositivo = 0;
+    internal const int PropiedadDispositivo = 0;
     private const int PropiedadPenalizacionBusqueda = 7;
-    private const uint CompartirLecturaEscritura = 0x3;
-    private const uint AbrirExistente = 3;
+    internal const uint CompartirLecturaEscritura = 0x3;
+    internal const uint AbrirExistente = 3;
     private const int TamanoRespuesta = 1024;
 
     public static PerfilDisco Detectar(string ruta)
@@ -109,7 +109,7 @@ public static class DetectorDiscos
         return respuesta[8] != 0 ? MedioDisco.Mecanico : MedioDisco.Ssd;
     }
 
-    private static (BusDisco Bus, string Modelo) LeerDispositivo(SafeFileHandle volumen)
+    internal static (BusDisco Bus, string Modelo) LeerDispositivo(SafeFileHandle volumen)
     {
         var respuesta = Consultar(volumen, PropiedadDispositivo);
         if (respuesta is null || respuesta.Length < 32)
@@ -133,7 +133,7 @@ public static class DetectorDiscos
         return (bus, LeerTexto(respuesta, BitConverter.ToInt32(respuesta, 16)));
     }
 
-    private static string LeerTexto(byte[] respuesta, int inicio)
+    internal static string LeerTexto(byte[] respuesta, int inicio)
     {
         if (inicio <= 0 || inicio >= respuesta.Length)
         {
@@ -146,7 +146,7 @@ public static class DetectorDiscos
     }
 
     /// <summary>El número del disco físico, o null si el volumen ocupa varios discos (RAID por software).</summary>
-    private static int? LeerNumeroDisco(SafeFileHandle volumen)
+    internal static int? LeerNumeroDisco(SafeFileHandle volumen)
     {
         var respuesta = new byte[TamanoRespuesta];
         if (!DeviceIoControl(volumen, ExtensionesDeVolumen, null, 0, respuesta, respuesta.Length, out _, IntPtr.Zero))
@@ -158,7 +158,7 @@ public static class DetectorDiscos
         return BitConverter.ToUInt32(respuesta, 0) == 1 ? BitConverter.ToInt32(respuesta, 8) : null;
     }
 
-    private static byte[]? Consultar(SafeFileHandle volumen, int propiedad)
+    internal static byte[]? Consultar(SafeFileHandle volumen, int propiedad)
     {
         // STORAGE_PROPERTY_QUERY: PropertyId (4), QueryType (4) = estándar, AdditionalParameters (4).
         var consulta = new byte[12];
@@ -171,11 +171,11 @@ public static class DetectorDiscos
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFile(
+    internal static extern SafeFileHandle CreateFile(
         string nombre, uint acceso, uint compartir, IntPtr seguridad, uint creacion, uint atributos, IntPtr plantilla);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DeviceIoControl(
+    internal static extern bool DeviceIoControl(
         SafeFileHandle dispositivo, uint codigo, byte[]? entrada, int tamanoEntrada, byte[] salida, int tamanoSalida, out int devueltos, IntPtr superpuesto);
 }

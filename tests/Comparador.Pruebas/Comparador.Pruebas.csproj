@@ -21,6 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Recursos\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Comparador.Nucleo\Comparador.Nucleo.csproj" />
     <ProjectReference Include="..\..\src\Comparador.App\Comparador.App.csproj" />
   </ItemGroup>
