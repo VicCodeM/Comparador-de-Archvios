@@ -6,9 +6,8 @@ namespace Comparador.Nucleo.Servicios;
 /// <summary>Lo que se pidió copiar (o mover): archivos y carpetas sueltos hacia una carpeta destino.</summary>
 public sealed record PedidoCopia(IReadOnlyList<string> Rutas, string Destino, bool Mover = false)
 {
-    public string Descripcion => Rutas.Count == 1
-        ? $"{Path.GetFileName(Rutas[0].TrimEnd('\\'))} → {Destino}"
-        : $"{Rutas.Count:N0} elementos → {Destino}";
+    /// <summary>Qué se copia, en corto: el nombre si es uno solo, o cuántos.</summary>
+    public string Que => Rutas.Count == 1 ? Path.GetFileName(Rutas[0].TrimEnd('\\')) : $"{Rutas.Count:N0} elementos";
 }
 
 /// <summary>

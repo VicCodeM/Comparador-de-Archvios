@@ -16,6 +16,7 @@
     <conv:EnumMarcadoConverter x:Key="EnumMarcado" />
     <conv:NoEsConverter x:Key="NoEs" />
     <conv:ReglaTextoConverter x:Key="ReglaTexto" />
+    <conv:PorcentajeAFraccionConverter x:Key="PorcentajeAFraccion" />
 
     <!-- Título de página, como "Inicio" en PowerToys -->
     <Style x:Key="TituloPagina" TargetType="TextBlock">

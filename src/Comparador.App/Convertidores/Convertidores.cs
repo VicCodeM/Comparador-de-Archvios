@@ -107,11 +107,21 @@ public sealed class NoEsConverter : ConvertidorDeIda
 
 public sealed class ReglaTextoConverter : ConvertidorDeIda
 {
-    public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    public static string Texto(ReglaConflicto regla) => regla switch
     {
         ReglaConflicto.SoloSiEsMasNuevo => "Reemplazar solo si es más nuevo",
         ReglaConflicto.Saltar => "No tocarlo (saltar)",
         ReglaConflicto.ConservarAmbos => "Conservar los dos (renombrar)",
         _ => "Reemplazarlo",
     };
+
+    public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is ReglaConflicto regla ? Texto(regla) : string.Empty;
+}
+
+/// <summary>De 0-100 a 0-1, para la barra de la tarea en la barra de tareas de Windows.</summary>
+public sealed class PorcentajeAFraccionConverter : ConvertidorDeIda
+{
+    public override object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is double porcentaje ? porcentaje / 100 : 0.0;
 }

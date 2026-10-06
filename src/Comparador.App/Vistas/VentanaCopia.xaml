@@ -1,0 +1,97 @@
+<ui:FluentWindow x:Class="Comparador.App.Vistas.VentanaCopia"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="{Binding Titulo}"
+                 Width="600" SizeToContent="Height" ResizeMode="CanMinimize"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica">
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo ProgressState="Normal" ProgressValue="{Binding Progreso.Porcentaje, Converter={StaticResource PorcentajeAFraccion}}" />
+    </Window.TaskbarItemInfo>
+
+    <StackPanel>
+        <ui:TitleBar Title="{Binding Titulo}" ShowMaximize="False">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/app.ico" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <StackPanel Margin="20,0,20,18">
+            <TextBlock Text="{Binding HaciaDonde}" Style="{StaticResource TextoSecundario}" Margin="0,0,0,10" ToolTip="{Binding Pedido.Destino}" />
+            <!-- En cola -->
+            <TextBlock Text="En cola: empieza cuando termine la copia anterior." Style="{StaticResource TextoSecundario}"
+                       Visibility="{Binding EnCola, Converter={StaticResource BoolAVisible}}" />
+
+            <!-- Avance -->
+            <StackPanel DataContext="{Binding Progreso}"
+                        Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolAVisible}}">
+                <Grid>
+                    <TextBlock Text="{Binding Fase}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock HorizontalAlignment="Right" FontSize="16" FontWeight="SemiBold" Text="{Binding Porcentaje, StringFormat='{}{0:0}%'}" />
+                </Grid>
+                <ProgressBar Margin="0,10" Height="4" Maximum="100" Value="{Binding Porcentaje, Mode=OneWay}" IsIndeterminate="{Binding Indeterminado}" />
+                <Grid>
+                    <TextBlock Text="{Binding Detalle}" Style="{StaticResource TextoSecundario}" />
+                    <TextBlock HorizontalAlignment="Right" Text="{Binding Velocidad}" Style="{StaticResource TextoSecundario}" />
+                </Grid>
+                <Grid Margin="0,6,0,0">
+                    <TextBlock Text="{Binding Restante}" FontWeight="SemiBold" />
+                    <TextBlock HorizontalAlignment="Right" Text="{Binding Hilos}" Style="{StaticResource TextoSecundario}" />
+                </Grid>
+                <TextBlock Margin="0,6,0,0" Style="{StaticResource TextoSecundario}"
+                           Text="{Binding EnCurso[0].Nombre, StringFormat='Ahora: {0}', FallbackValue=''}" />
+            </StackPanel>
+
+            <!-- Terminado -->
+            <ui:InfoBar Title="{Binding Resumen}" Severity="{Binding Severidad}" IsOpen="True" IsClosable="False"
+                        Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}}" />
+
+            <!-- Botones -->
+            <Grid Margin="0,14,0,0">
+                <ui:Button x:Name="BotonOpciones" Click="AbrirOpciones" Appearance="Transparent" ToolTip="Más opciones">
+                    <ui:SymbolIcon Symbol="MoreHorizontal24" />
+                    <ui:Button.ContextMenu>
+                        <ContextMenu x:Name="MenuOpciones" Placement="Top" />
+                    </ui:Button.ContextMenu>
+                </ui:Button>
+                <TextBlock Margin="44,0,0,0" VerticalAlignment="Center" Style="{StaticResource TextoSecundario}" Text="{Binding DescripcionOpciones}" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
+                    <ui:Button Command="{Binding PausarOReanudarCommand}" Margin="0,0,8,0" MinWidth="104"
+                               IsEnabled="{Binding Copiando}">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Content" Value="Pausar" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EnPausa}" Value="True">
+                                        <Setter Property="Content" Value="Reanudar" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
+                    </ui:Button>
+                    <ui:Button Content="Saltar" Command="{Binding SaltarActualCommand}" Margin="0,0,8,0" IsEnabled="{Binding Copiando}"
+                               ToolTip="Deja el archivo actual como estaba y sigue con los demás" />
+                    <ui:Button Content="Cancelar" Command="{Binding CancelarCommand}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}}">
+                    <ui:Button Content="Abrir destino" Command="{Binding AbrirDestinoCommand}" Margin="0,0,8,0" />
+                    <ui:Button Content="Cerrar" Appearance="Primary" Click="Cerrar" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Detalles: lo mismo que la página de copia, en pequeño -->
+            <StackPanel Margin="0,14,0,0" Visibility="{Binding VerDetalles, Converter={StaticResource BoolAVisible}}">
+                <ItemsControl ItemsSource="{Binding Progreso.EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+                <Border Style="{StaticResource Tarjeta}" Padding="8,4" Margin="0,8,0,0" Height="260">
+                    <ui:ListView ItemsSource="{Binding Terminados.Lista}" ItemTemplate="{StaticResource PlantillaTerminado}"
+                                 Background="Transparent" BorderThickness="0"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" />
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</ui:FluentWindow>

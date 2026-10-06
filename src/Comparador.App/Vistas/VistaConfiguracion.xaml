@@ -73,6 +73,18 @@
                 </StackPanel>
             </ui:CardExpander>
 
+            <TextBlock Text="Explorador de Windows" Style="{StaticResource TituloSeccion}" />
+            <ui:CardControl Icon="{ui:SymbolIcon FolderOpen24}">
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Copiar y mover desde el clic derecho" FontSize="14" />
+                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
+                                   Text="Agrega &quot;Pegar aquí con Comparador&quot; (pega lo copiado con Ctrl+C, o mueve lo cortado con Ctrl+X) y &quot;Copiar / Mover con Comparador a...&quot;. Cada copia abre su ventanita, y si ya hay una en marcha, espera en cola. En Windows 11 están en &quot;Mostrar más opciones&quot;." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding IntegradoExplorador}" />
+            </ui:CardControl>
+
             <TextBlock Text="Permisos" Style="{StaticResource TituloSeccion}" />
             <ui:CardControl Icon="{ui:SymbolIcon ShieldTask24}">
                 <ui:CardControl.Header>

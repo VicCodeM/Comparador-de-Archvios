@@ -61,6 +61,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [ObservableProperty] private bool evitarSuspension = true;
     [ObservableProperty] private ReglaConflicto siYaExiste = ReglaConflicto.Reemplazar;
     [ObservableProperty] private bool enPausa;
+    [ObservableProperty] private bool integradoExplorador = IntegracionExplorador.EstaInstalada();
     [ObservableProperty] private bool copiaTerminada;
     [ObservableProperty] private string resumenCopia = string.Empty;
     [ObservableProperty] private InfoBarSeverity severidadCopia = InfoBarSeverity.Success;
@@ -225,6 +226,27 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     partial void OnEvitarSuspensionChanged(bool value) => Guardar();
 
     partial void OnSiYaExisteChanged(ReglaConflicto value) => Guardar();
+
+    /// <summary>Pone o quita las opciones del clic derecho del Explorador (solo para este usuario).</summary>
+    partial void OnIntegradoExploradorChanged(bool value)
+    {
+        try
+        {
+            if (value)
+            {
+                IntegracionExplorador.Instalar();
+                Avisos.Exito("Listo: en el clic derecho del Explorador (en Windows 11, en \"Mostrar más opciones\") ya está el Comparador");
+            }
+            else
+            {
+                IntegracionExplorador.Quitar();
+            }
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException)
+        {
+            Avisos.Error($"No se pudo cambiar el menú del Explorador: {error.Message}");
+        }
+    }
 
     public IReadOnlyList<ReglaConflicto> Reglas { get; } = Enum.GetValues<ReglaConflicto>();
 
