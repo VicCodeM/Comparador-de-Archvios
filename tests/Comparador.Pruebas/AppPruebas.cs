@@ -44,10 +44,13 @@ public sealed class AppPruebas
             Assert.True(IntegracionExplorador.EstaInstalada(raiz));
             using var comando = Registry.CurrentUser.OpenSubKey($@"{raiz}\Directory\Background\shell\Comparador.Pegar\command");
             Assert.Equal($"\"{ejecutable}\" pegar \"%V\"", comando?.GetValue(string.Empty) as string);
+            using var arrastre = Registry.CurrentUser.OpenSubKey($@"{raiz}\CLSID\{{7B1C5E2A-3F4D-4E8B-9A61-2C0D5E7F8A93}}\InProcServer32");
+            Assert.Equal(@"C:\Programas\Espejo\EspejoExplorador.dll", arrastre?.GetValue(string.Empty) as string);
 
             IntegracionExplorador.Quitar(raiz);
             Assert.False(IntegracionExplorador.EstaInstalada(raiz));
             Assert.Null(Registry.CurrentUser.OpenSubKey($@"{raiz}\*\shell\Comparador.CopiarA"));
+            Assert.Null(Registry.CurrentUser.OpenSubKey($@"{raiz}\Directory\shellex\DragDropHandlers\Espejo"));
         }
         finally
         {

@@ -29,4 +29,12 @@
     <Resource Include="app.ico" />
   </ItemGroup>
 
+  <!-- El menú del arrastre con el botón derecho es un componente nativo (C++): se compila junto a Espejo.exe.
+       Si el Explorador lo tiene cargado, el archivo está en uso: solo se recompila cuando cambia su código. -->
+  <Target Name="CompilarMenuArrastre" BeforeTargets="Build"
+          Inputs="..\Espejo.Explorador\MenuArrastre.cpp;..\Espejo.Explorador\EspejoExplorador.def;..\Espejo.Explorador\compilar.cmd"
+          Outputs="$(OutDir)EspejoExplorador.dll">
+    <Exec Command="&quot;$(MSBuildProjectDirectory)\..\Espejo.Explorador\compilar.cmd&quot; &quot;$(MSBuildProjectDirectory)\$(OutDir)&quot;" />
+  </Target>
+
 </Project>
