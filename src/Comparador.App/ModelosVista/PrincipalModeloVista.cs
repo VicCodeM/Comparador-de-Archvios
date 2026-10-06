@@ -521,6 +521,21 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [RelayCommand]
     private void IrA(Pagina pagina) => PaginaActual = pagina;
 
+    /// <summary>Copia rápida como TeraCopy: sin comparar, elige qué y a dónde, y se abre la ventanita.</summary>
+    [RelayCommand]
+    private void CopiarArchivos() => LanzarCopiaRapida(Escritorio.ElegirArchivos("Elegir los archivos a copiar"));
+
+    [RelayCommand]
+    private void CopiarCarpetas() => LanzarCopiaRapida(Escritorio.ElegirCarpetas("Elegir las carpetas a copiar"));
+
+    private static void LanzarCopiaRapida(IReadOnlyList<string> rutas)
+    {
+        if (rutas.Count > 0 && LineaDeComandos.Completar(new PedidoExterno(rutas, null, Mover: false, PreguntarDestino: true)) is { } pedido)
+        {
+            App.Cola.Agregar(pedido);
+        }
+    }
+
     /// <summary>Los que fallaron siguen marcados y pendientes: volver a copiar solo toca a esos (y a lo que siga marcado).</summary>
     [RelayCommand(CanExecute = nameof(PuedeEmpezar))]
     private Task ReintentarFallidosAsync() => IniciarCopiaAsync();

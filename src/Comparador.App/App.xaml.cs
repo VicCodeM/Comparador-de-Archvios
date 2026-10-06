@@ -12,7 +12,9 @@ namespace Comparador.App;
 public partial class App : Application
 {
     private InstanciaUnica? instancia;
-    private ColaDeCopias? cola;
+
+    /// <summary>La cola de copias rápidas: la usan el Explorador y el botón "Copiar archivos..." de la ventana principal.</summary>
+    public static ColaDeCopias Cola { get; private set; } = null!;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,7 +27,7 @@ public partial class App : Application
         }
 
         Apariencia.Aplicar(Configuracion.Cargar().Tema);
-        cola = new ColaDeCopias(new AccionesArchivo(new AvisosModeloVista()));
+        Cola = new ColaDeCopias(new AccionesArchivo(new AvisosModeloVista()));
         instancia.Escuchar(Recibir, MostrarPrincipal);
         if (LineaDeComandos.Interpretar(e.Args) is { } pedido)
         {
@@ -41,7 +43,7 @@ public partial class App : Application
     {
         if (LineaDeComandos.Completar(pedido) is { } listo)
         {
-            cola!.Agregar(listo);
+            Cola.Agregar(listo);
         }
         else if (Windows.Count == 0)
         {

@@ -11,7 +11,16 @@
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="40,28,40,24" MaxWidth="1000">
-                <TextBlock Text="Ubicaciones" Style="{StaticResource TituloPagina}" />
+                <Grid>
+                    <TextBlock Text="Ubicaciones" Style="{StaticResource TituloPagina}" />
+                    <!-- Copia rápida como TeraCopy: sin comparar, abre la ventanita -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,0,0">
+                        <ui:Button Content="Copiar archivos..." Icon="{ui:SymbolIcon DocumentCopy24}" Command="{Binding CopiarArchivosCommand}" Margin="0,0,8,0"
+                                   ToolTip="Copia rápida sin comparar: elige los archivos y el destino, y se abre la ventanita de copia" />
+                        <ui:Button Content="Copiar carpetas..." Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding CopiarCarpetasCommand}"
+                                   ToolTip="Copia rápida sin comparar: elige las carpetas y el destino, y se abre la ventanita de copia" />
+                    </StackPanel>
+                </Grid>
 
                 <vistas:SelectorUbicacion DataContext="{Binding Origen}" />
                 <ui:Button HorizontalAlignment="Center" Margin="0,6" Appearance="Transparent"

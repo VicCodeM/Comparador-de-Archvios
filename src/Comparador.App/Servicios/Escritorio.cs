@@ -19,6 +19,22 @@ public static class Escritorio
         return dialogo.ShowDialog() == true ? dialogo.FolderName : null;
     }
 
+    /// <summary>Archivos sueltos (varios a la vez). Vacío si se canceló.</summary>
+    public static IReadOnlyList<string> ElegirArchivos(string titulo)
+    {
+        var dialogo = new OpenFileDialog { Title = titulo, Multiselect = true };
+
+        return dialogo.ShowDialog() == true ? dialogo.FileNames : [];
+    }
+
+    /// <summary>Carpetas (varias a la vez). Vacío si se canceló.</summary>
+    public static IReadOnlyList<string> ElegirCarpetas(string titulo)
+    {
+        var dialogo = new OpenFolderDialog { Title = titulo, Multiselect = true };
+
+        return dialogo.ShowDialog() == true ? dialogo.FolderNames : [];
+    }
+
     public static string? ElegirDondeGuardar(string titulo, string nombre, string filtro)
     {
         var dialogo = new SaveFileDialog { Title = titulo, FileName = nombre, Filter = filtro };
