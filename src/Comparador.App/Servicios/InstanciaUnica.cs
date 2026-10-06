@@ -12,18 +12,28 @@ namespace Comparador.App.Servicios;
 /// </summary>
 public sealed class InstanciaUnica : IDisposable
 {
-    private const string Nombre = "VMSofts.ComparadorArchivos";
+    /// <summary>
+    /// Distinto para la app abierta como administrador: Windows no deja que una apertura normal (la del Explorador)
+    /// le hable a una de administrador. Con un solo nombre, la del Explorador fallaba y se cerraba sin mostrar nada.
+    /// </summary>
+    private static readonly string Nombre = "VMSofts.ComparadorArchivos" + (Elevacion.EsAdministrador() ? ".Admin" : string.Empty);
     private static readonly TimeSpan EsperaParaJuntar = TimeSpan.FromMilliseconds(500);
 
-    private readonly Mutex unica;
+    private readonly Mutex? unica;
     private readonly CancellationTokenSource fin = new();
     private readonly List<PedidoExterno> pendientes = [];
     private readonly Lock cerrojo = new();
     private Timer? juntar;
 
-    private InstanciaUnica(Mutex unica) => this.unica = unica;
+    private InstanciaUnica(Mutex? unica) => this.unica = unica;
 
-    /// <summary>La instancia principal, o null si ya había otra (a la que se le pasaron los argumentos).</summary>
+    /// <summary>Sin otra app a la que hablarle: esta trabaja por su cuenta y no escucha a nadie.</summary>
+    private bool PorSuCuenta => unica is null;
+
+    /// <summary>
+    /// La instancia que debe trabajar, o null si ya había otra y el pedido se le entregó. Si la entrega falla, esta
+    /// apertura trabaja por su cuenta: nunca se cierra en silencio dejando al usuario sin ventana.
+    /// </summary>
     public static InstanciaUnica? Tomar(IReadOnlyList<string> argumentos)
     {
         var unica = new Mutex(initiallyOwned: true, Nombre, out var esLaPrimera);
@@ -33,16 +43,21 @@ public sealed class InstanciaUnica : IDisposable
         }
 
         unica.Dispose();
-        Enviar(argumentos);
 
-        return null;
+        return Enviar(argumentos) ? null : new InstanciaUnica(unica: null);
     }
 
     /// <summary>
     /// Escucha pedidos de otras aperturas y los entrega (juntados) en el hilo de la ventana. Una apertura sin pedido
     /// (desde el menú Inicio) trae al frente la ventana principal.
     /// </summary>
-    public void Escuchar(Action<PedidoExterno> alRecibir, Action alAbrirSinPedido) => _ = Task.Run(() => EscucharAsync(alRecibir, alAbrirSinPedido));
+    public void Escuchar(Action<PedidoExterno> alRecibir, Action alAbrirSinPedido)
+    {
+        if (!PorSuCuenta)
+        {
+            _ = Task.Run(() => EscucharAsync(alRecibir, alAbrirSinPedido));
+        }
+    }
 
     private async Task EscucharAsync(Action<PedidoExterno> alRecibir, Action alAbrirSinPedido)
     {
@@ -69,9 +84,9 @@ public sealed class InstanciaUnica : IDisposable
             {
                 return;
             }
-            catch (Exception error) when (error is IOException or JsonException)
+            catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
             {
-                // Una apertura que se cerró a medias no debe tumbar la escucha de las siguientes.
+                // Una apertura que se cerró a medias (o sin permiso) no debe tumbar la escucha de las siguientes.
             }
         }
     }
@@ -112,17 +127,20 @@ public sealed class InstanciaUnica : IDisposable
     /// <summary>Lo que llegó en la primera apertura también pasa por aquí, para juntarse con las que vengan.</summary>
     public void RecibirPropio(PedidoExterno pedido, Action<PedidoExterno> alRecibir) => Recibir(pedido, alRecibir);
 
-    private static void Enviar(IReadOnlyList<string> argumentos)
+    /// <summary>True si la otra app recibió el pedido.</summary>
+    private static bool Enviar(IReadOnlyList<string> argumentos)
     {
         try
         {
             using var tuberia = new NamedPipeClientStream(".", Nombre, PipeDirection.Out, PipeOptions.CurrentUserOnly);
-            tuberia.Connect(TimeSpan.FromSeconds(5));
+            tuberia.Connect(TimeSpan.FromSeconds(3));
             JsonSerializer.Serialize(tuberia, argumentos);
+
+            return true;
         }
-        catch (Exception error) when (error is IOException or TimeoutException)
+        catch (Exception error) when (error is IOException or TimeoutException or UnauthorizedAccessException)
         {
-            // La principal se estaba cerrando: el pedido se pierde, pero no se queda colgada una ventana fantasma.
+            return false;
         }
     }
 
@@ -130,7 +148,7 @@ public sealed class InstanciaUnica : IDisposable
     {
         fin.Cancel();
         juntar?.Dispose();
-        unica.ReleaseMutex();
-        unica.Dispose();
+        unica?.ReleaseMutex();
+        unica?.Dispose();
     }
 }
