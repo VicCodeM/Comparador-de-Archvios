@@ -18,7 +18,6 @@ internal sealed class DiscoCrudo : IDisposable
     private const uint BloquearVolumen = 0x90018;
     private const uint DesmontarVolumen = 0x90020;
     private const uint ActualizarPropiedades = 0x70140;
-    private const uint ExtensionesDeVolumen = 0x560000;
     private const int AccesoDenegado = 5;
 
     private readonly SafeFileHandle disco;
@@ -64,10 +63,10 @@ internal sealed class DiscoCrudo : IDisposable
     private static List<SafeFileHandle> BloquearVolumenesDe(int numero)
     {
         var bloqueados = new List<SafeFileHandle>();
-        foreach (var volumen in Volumenes())
+        foreach (var volumen in VolumenesWindows.Leer().Where(volumen => volumen.Disco == numero).DistinctBy(volumen => volumen.Ruta))
         {
-            var manejador = DetectorDiscos.CreateFile(volumen, Leer | Escribir, DetectorDiscos.CompartirLecturaEscritura, IntPtr.Zero, DetectorDiscos.AbrirExistente, 0, IntPtr.Zero);
-            if (manejador.IsInvalid || !EstaEnDisco(manejador, numero))
+            var manejador = DetectorDiscos.CreateFile(volumen.Dispositivo, Leer | Escribir, DetectorDiscos.CompartirLecturaEscritura, IntPtr.Zero, DetectorDiscos.AbrirExistente, 0, IntPtr.Zero);
+            if (manejador.IsInvalid)
             {
                 manejador.Dispose();
                 continue;
@@ -82,44 +81,6 @@ internal sealed class DiscoCrudo : IDisposable
         return bloqueados;
     }
 
-    private static bool EstaEnDisco(SafeFileHandle volumen, int numero)
-    {
-        var respuesta = new byte[1024];
-        if (!DetectorDiscos.DeviceIoControl(volumen, ExtensionesDeVolumen, null, 0, respuesta, respuesta.Length, out _, IntPtr.Zero))
-        {
-            return false;
-        }
-
-        // VOLUME_DISK_EXTENTS: cantidad (4) + relleno (4) + extensiones de 24 bytes con el número de disco al inicio.
-        var cantidad = BitConverter.ToInt32(respuesta, 0);
-
-        return Enumerable.Range(0, cantidad).Any(indice => BitConverter.ToInt32(respuesta, 8 + indice * 24) == numero);
-    }
-
-    /// <summary>Todos los volúmenes del equipo como "\\?\Volume{...}" (sin la barra final, para abrir el volumen y no su raíz).</summary>
-    private static IEnumerable<string> Volumenes()
-    {
-        var nombre = new char[64];
-        var busqueda = FindFirstVolume(nombre, nombre.Length);
-        if (busqueda == new IntPtr(-1))
-        {
-            yield break;
-        }
-
-        try
-        {
-            do
-            {
-                yield return new string(nombre, 0, Array.IndexOf(nombre, '\0')).TrimEnd('\\');
-            }
-            while (FindNextVolume(busqueda, nombre, nombre.Length));
-        }
-        finally
-        {
-            FindVolumeClose(busqueda);
-        }
-    }
-
     public void Dispose()
     {
         disco.Dispose();
@@ -128,15 +89,4 @@ internal sealed class DiscoCrudo : IDisposable
             volumen.Dispose();
         }
     }
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "FindFirstVolumeW")]
-    private static extern IntPtr FindFirstVolume(char[] nombre, int largo);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "FindNextVolumeW")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool FindNextVolume(IntPtr busqueda, char[] nombre, int largo);
-
-    [DllImport("kernel32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool FindVolumeClose(IntPtr busqueda);
 }

@@ -13,7 +13,6 @@ public static class ListadoDiscos
     private const int MaximoDiscos = 64;
     private const uint GeometriaExtendida = 0x700A0;
     private const uint DisposicionExtendida = 0x70050;
-    private const uint ExtensionesDeVolumen = 0x560000;
     private const int InicioEntradas = 48;
     private const int TamanoEntrada = 144;
 
@@ -22,6 +21,7 @@ public static class ListadoDiscos
     public static IReadOnlyList<DiscoFisico> Leer()
     {
         var montajes = Montajes();
+        var volumenes = VolumenesWindows.Leer();
         var deWindows = MontajeDe(Path.GetPathRoot(Environment.SystemDirectory)!)?.Disco;
         var discos = new List<DiscoFisico>();
         for (var numero = 0; numero < MaximoDiscos; numero++)
@@ -29,7 +29,8 @@ public static class ListadoDiscos
             using var disco = Abrir(numero);
             if (!disco.IsInvalid)
             {
-                discos.Add(Describir(disco, numero, numero == deWindows, montajes.Where(montaje => montaje.Disco == numero).ToList()));
+                discos.Add(Describir(disco, numero, numero == deWindows,
+                    montajes.Where(montaje => montaje.Disco == numero).ToList(), volumenes.Where(volumen => volumen.Disco == numero).ToList()));
             }
         }
 
@@ -41,12 +42,13 @@ public static class ListadoDiscos
     private static SafeFileHandle AbrirSinAcceso(string ruta) => DetectorDiscos.CreateFile(
         ruta, 0, DetectorDiscos.CompartirLecturaEscritura, IntPtr.Zero, DetectorDiscos.AbrirExistente, 0, IntPtr.Zero);
 
-    private static DiscoFisico Describir(SafeFileHandle disco, int numero, bool esDeWindows, IReadOnlyList<Montaje> montajes)
+    private static DiscoFisico Describir(
+        SafeFileHandle disco, int numero, bool esDeWindows, IReadOnlyList<Montaje> montajes, IReadOnlyList<VolumenWindows> volumenes)
     {
         var (bus, _) = DetectorDiscos.LeerDispositivo(disco);
         var descriptor = DetectorDiscos.Consultar(disco, DetectorDiscos.PropiedadDispositivo) ?? [];
         var (tamano, sector) = LeerGeometria(disco);
-        var (estilo, particiones) = LeerParticiones(disco, montajes);
+        var (estilo, particiones) = LeerParticiones(disco, montajes, volumenes);
 
         return new DiscoFisico(
             numero,
@@ -85,9 +87,11 @@ public static class ListadoDiscos
 
     /// <summary>
     /// DRIVE_LAYOUT_INFORMATION_EX: estilo (0 MBR, 1 GPT, 2 nada) y cantidad; las entradas empiezan en el byte 48 y
-    /// miden 144. En cada una: inicio (8), tamaño (16), número (24) y el tipo en el 32 (un byte en MBR, un GUID en GPT).
+    /// miden 144. En cada una: inicio (8), tamaño (16), número (24) y desde el 32 lo propio del estilo: en MBR el tipo
+    /// (1 byte) y si es la activa (33); en GPT el tipo (GUID) y los atributos en el 64.
     /// </summary>
-    private static (EstiloParticiones, IReadOnlyList<Particion>) LeerParticiones(SafeFileHandle disco, IReadOnlyList<Montaje> montajes)
+    private static (EstiloParticiones, IReadOnlyList<Particion>) LeerParticiones(
+        SafeFileHandle disco, IReadOnlyList<Montaje> montajes, IReadOnlyList<VolumenWindows> volumenes)
     {
         var respuesta = new byte[InicioEntradas + TamanoEntrada * 128];
         if (!DetectorDiscos.DeviceIoControl(disco, DisposicionExtendida, null, 0, respuesta, respuesta.Length, out _, IntPtr.Zero))
@@ -107,46 +111,38 @@ public static class ListadoDiscos
             var entrada = InicioEntradas + indice * TamanoEntrada;
             var inicio = BitConverter.ToInt64(respuesta, entrada + 8);
             var tamano = BitConverter.ToInt64(respuesta, entrada + 16);
-            var tipo = estilo == EstiloParticiones.Gpt
-                ? TiposParticion.DeGpt(new Guid(respuesta.AsSpan(entrada + 32, 16)))
-                : TiposParticion.DeMbr(respuesta[entrada + 32]);
+            var esGpt = estilo == EstiloParticiones.Gpt;
+            var tipoGpt = esGpt ? new Guid(respuesta.AsSpan(entrada + 32, 16)) : Guid.Empty;
+            var tipoMbr = esGpt ? (byte)0 : respuesta[entrada + 32];
+            var tipo = esGpt ? TiposParticion.DeGpt(tipoGpt) : TiposParticion.DeMbr(tipoMbr);
             if (tamano > 0 && tipo is not null)
             {
                 var letra = montajes.FirstOrDefault(montaje => montaje.Inicio == inicio)?.Letra;
-                particiones.Add(new Particion(BitConverter.ToInt32(respuesta, entrada + 24), inicio, tamano, ConFormato(tipo, letra), letra));
+                var volumen = volumenes.FirstOrDefault(candidato => candidato.Inicio == inicio);
+                var contenido = volumen?.Contenido();
+                particiones.Add(new Particion(
+                    BitConverter.ToInt32(respuesta, entrada + 24), inicio, tamano, ConFormato(tipo, contenido?.SistemaArchivos), letra,
+                    tipoGpt, tipoMbr, esGpt ? BitConverter.ToUInt64(respuesta, entrada + 64) : 0, !esGpt && respuesta[entrada + 33] != 0,
+                    volumen?.Ruta, contenido?.SistemaArchivos, contenido?.Usado));
             }
         }
 
         return (estilo, particiones);
     }
 
-    private static string ConFormato(string tipo, string? letra)
-    {
-        try
-        {
-            return letra is not null && new DriveInfo(letra) is { IsReady: true } unidad ? $"{tipo} ({unidad.DriveFormat})" : tipo;
-        }
-        catch (IOException)
-        {
-            return tipo;
-        }
-    }
+    private static string ConFormato(string tipo, string? sistemaArchivos) =>
+        sistemaArchivos is { Length: > 0 } && !tipo.Contains(sistemaArchivos, StringComparison.OrdinalIgnoreCase) ? $"{tipo} ({sistemaArchivos})" : tipo;
 
     private static List<Montaje> Montajes() =>
         Environment.GetLogicalDrives().Select(MontajeDe).OfType<Montaje>().ToList();
 
-    /// <summary>VOLUME_DISK_EXTENTS de una letra: en qué disco está y en qué byte empieza (solo si ocupa un disco).</summary>
+    /// <summary>En qué disco está una letra y en qué byte empieza (solo si ocupa un único disco).</summary>
     private static Montaje? MontajeDe(string letra)
     {
-        using var volumen = AbrirSinAcceso($@"\\.\{letra.TrimEnd('\\')}");
-        var respuesta = new byte[1024];
-        if (volumen.IsInvalid
-            || !DetectorDiscos.DeviceIoControl(volumen, ExtensionesDeVolumen, null, 0, respuesta, respuesta.Length, out _, IntPtr.Zero)
-            || BitConverter.ToUInt32(respuesta, 0) != 1)
-        {
-            return null;
-        }
+        var sinBarra = letra.TrimEnd('\\');
+        using var volumen = AbrirSinAcceso($@"\\.\{sinBarra}");
+        var extensiones = volumen.IsInvalid ? [] : VolumenesWindows.Extensiones(volumen).ToList();
 
-        return new Montaje(BitConverter.ToInt32(respuesta, 8), BitConverter.ToInt64(respuesta, 16), letra.TrimEnd('\\'));
+        return extensiones.Count == 1 ? new Montaje(extensiones[0].Disco, extensiones[0].Inicio, sinBarra) : null;
     }
 }
