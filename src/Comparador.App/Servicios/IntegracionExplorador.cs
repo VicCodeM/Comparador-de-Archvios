@@ -8,7 +8,7 @@ namespace Comparador.App.Servicios;
 /// </summary>
 public static class IntegracionExplorador
 {
-    private const string Raiz = @"Software\Classes";
+    public const string RaizWindows = @"Software\Classes";
     private const string Prefijo = "Comparador.";
 
     private sealed record Verbo(string Clase, string Clave, string Texto, string Argumentos);
@@ -23,17 +23,20 @@ public static class IntegracionExplorador
         new("Directory", "MoverA", "Mover con Comparador a...", "mover \"%1\""),
     ];
 
-    private static string RutaVerbo(Verbo verbo) => $@"{Raiz}\{verbo.Clase}\shell\{Prefijo}{verbo.Clave}";
+    private static string RutaVerbo(string raiz, Verbo verbo) => $@"{raiz}\{verbo.Clase}\shell\{Prefijo}{verbo.Clave}";
 
-    public static bool EstaInstalada() => Verbos().All(verbo => Registry.CurrentUser.OpenSubKey(RutaVerbo(verbo)) is { } clave && Cerrar(clave));
+    /// <param name="raiz">Solo las pruebas cambian la raíz, para no tocar el menú real del usuario.</param>
+    public static bool EstaInstalada(string raiz = RaizWindows) =>
+        Verbos().All(verbo => Registry.CurrentUser.OpenSubKey(RutaVerbo(raiz, verbo)) is { } clave && Cerrar(clave));
 
     /// <summary>Escribe las opciones apuntando a este ejecutable (si la app se movió de carpeta, se corrige solo).</summary>
-    public static void Instalar()
+    public static void Instalar() => Instalar(RaizWindows, Environment.ProcessPath!);
+
+    public static void Instalar(string raiz, string ejecutable)
     {
-        var ejecutable = Environment.ProcessPath!;
         foreach (var verbo in Verbos())
         {
-            using var clave = Registry.CurrentUser.CreateSubKey(RutaVerbo(verbo));
+            using var clave = Registry.CurrentUser.CreateSubKey(RutaVerbo(raiz, verbo));
             clave.SetValue("MUIVerb", verbo.Texto);
             clave.SetValue("Icon", $"\"{ejecutable}\",0");
             // Con muchos archivos elegidos, Windows igual ofrece la opción (por defecto la esconde pasados 15).
@@ -43,11 +46,11 @@ public static class IntegracionExplorador
         }
     }
 
-    public static void Quitar()
+    public static void Quitar(string raiz = RaizWindows)
     {
         foreach (var verbo in Verbos())
         {
-            Registry.CurrentUser.DeleteSubKeyTree(RutaVerbo(verbo), throwOnMissingSubKey: false);
+            Registry.CurrentUser.DeleteSubKeyTree(RutaVerbo(raiz, verbo), throwOnMissingSubKey: false);
         }
     }
 
