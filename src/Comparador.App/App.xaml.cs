@@ -20,6 +20,15 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args is ["--desinstalar"])
+        {
+            // Lo llama el desinstalador: nada de Espejo debe quedar en el Explorador ni en el arranque de Windows.
+            IntegracionExplorador.Quitar();
+            ModoResidente.ArrancarConWindows(false);
+            Shutdown();
+            return;
+        }
+
         if (e.Args is ["clonar", var origen, var destino, ..])
         {
             Clonar(origen, destino, verificar: !e.Args.Contains("--sin-verificar"), ajustar: e.Args.Contains("--ajustar"));

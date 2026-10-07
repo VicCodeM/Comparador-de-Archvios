@@ -14,6 +14,8 @@
     <Authors>VMSofts</Authors>
     <Copyright>VMSofts © 2026</Copyright>
     <Version>2.0.0</Version>
+    <!-- Solo las traducciones que se usan: las librerías traen una docena de idiomas que solo engordan el instalador. -->
+    <SatelliteResourceLanguages>es;en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,10 +33,21 @@
 
   <!-- El menú del arrastre con el botón derecho es un componente nativo (C++): se compila junto a Espejo.exe.
        Si el Explorador lo tiene cargado, el archivo está en uso: solo se recompila cuando cambia su código. -->
-  <Target Name="CompilarMenuArrastre" BeforeTargets="Build"
+  <!-- Se compila en obj\nativo y va como un archivo más del proyecto: así llega a bin y también a la carpeta
+       publicada que empaqueta el instalador (compilado directo en bin, "dotnet publish" lo dejaba fuera). -->
+  <PropertyGroup>
+    <MenuArrastreCompilado>$(BaseIntermediateOutputPath)nativo\EspejoExplorador.dll</MenuArrastreCompilado>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MenuArrastreCompilado)" Link="EspejoExplorador.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="CompilarMenuArrastre" BeforeTargets="BeforeBuild"
           Inputs="..\Espejo.Explorador\MenuArrastre.cpp;..\Espejo.Explorador\EspejoExplorador.def;..\Espejo.Explorador\compilar.cmd"
-          Outputs="$(OutDir)EspejoExplorador.dll">
-    <Exec Command="&quot;$(MSBuildProjectDirectory)\..\Espejo.Explorador\compilar.cmd&quot; &quot;$(MSBuildProjectDirectory)\$(OutDir)&quot;" />
+          Outputs="$(MenuArrastreCompilado)">
+    <MakeDir Directories="$(BaseIntermediateOutputPath)nativo" />
+    <Exec Command="&quot;$(MSBuildProjectDirectory)\..\Espejo.Explorador\compilar.cmd&quot; &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)nativo\\&quot;" />
   </Target>
 
 </Project>

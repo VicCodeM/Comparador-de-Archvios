@@ -64,3 +64,6 @@ $RECYCLE.BIN/
 *.dll
 *.exe
 !**/[Pp]ackages/**/*.dll
+
+# Carpeta que empaqueta el instalador
+/publicar/
