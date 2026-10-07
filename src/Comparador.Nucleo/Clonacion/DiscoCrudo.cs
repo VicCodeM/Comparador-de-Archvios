@@ -18,6 +18,7 @@ internal sealed class DiscoCrudo : IDisposable
     private const uint BloquearVolumen = 0x90018;
     private const uint DesmontarVolumen = 0x90020;
     private const uint ActualizarPropiedades = 0x70140;
+    private const uint LargoDelDispositivo = 0x7405C;
     private const int AccesoDenegado = 5;
 
     private readonly SafeFileHandle disco;
@@ -30,6 +31,19 @@ internal sealed class DiscoCrudo : IDisposable
     }
 
     public static DiscoCrudo AbrirLectura(int numero) => new(Abrir($@"\\.\PhysicalDrive{numero}", Leer), []);
+
+    /// <summary>Un volumen (por ejemplo una instantánea "\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN") leído en crudo.</summary>
+    public static DiscoCrudo AbrirVolumen(string dispositivo) => new(Abrir(dispositivo, Leer), []);
+
+    /// <summary>GET_LENGTH_INFO: cuántos bytes tiene el disco o volumen abierto.</summary>
+    public long Largo()
+    {
+        var respuesta = new byte[8];
+
+        return DetectorDiscos.DeviceIoControl(disco, LargoDelDispositivo, null, 0, respuesta, respuesta.Length, out _, IntPtr.Zero)
+            ? BitConverter.ToInt64(respuesta)
+            : throw new IOException("Windows no dijo cuánto mide el volumen.");
+    }
 
     public static DiscoCrudo AbrirEscritura(int numero)
     {

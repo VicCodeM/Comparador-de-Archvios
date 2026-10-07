@@ -30,30 +30,95 @@ public sealed partial class ClonarModeloVista(AvisosModeloVista avisos) : Observ
     private IReadOnlyList<DiscoFisico> discos = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Problemas), nameof(Resumen))]
+    [NotifyPropertyChangedFor(nameof(Problemas), nameof(Resumen), nameof(PuedeAjustar), nameof(Plan))]
     [NotifyCanExecuteChangedFor(nameof(ClonarCommand))]
     private OpcionClon? origen;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Problemas), nameof(Resumen))]
+    [NotifyPropertyChangedFor(nameof(Problemas), nameof(Resumen), nameof(PuedeAjustar), nameof(Plan))]
     [NotifyCanExecuteChangedFor(nameof(ClonarCommand))]
     private OpcionClon? destino;
 
     [ObservableProperty] private bool verificar = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Problemas), nameof(Resumen), nameof(Plan))]
+    [NotifyCanExecuteChangedFor(nameof(ClonarCommand))]
+    private bool ajustar = true;
+
     public ObservableCollection<OpcionClon> Origenes { get; } = [];
 
     public ObservableCollection<OpcionClon> Destinos { get; } = [];
 
-    public IReadOnlyList<string> Problemas => Origen is null || Destino is null
-        ? []
-        : ReglasClon.Revisar(Origen.Extremo, Destino.Extremo, discos, LargoOrigen());
+    /// <summary>De un disco entero a otro: se puede clonar todo ajustando el tamaño y dejándolo arrancable.</summary>
+    public bool PuedeAjustar => Origen?.Extremo is ExtremoClon.DeDisco && Destino?.Extremo is ExtremoClon.DeDisco;
+
+    private bool Ajustando => PuedeAjustar && Ajustar;
+
+    public IReadOnlyList<string> Problemas
+    {
+        get
+        {
+            if (Origen is null || Destino is null)
+            {
+                return [];
+            }
+
+            var problemas = ReglasClon.Revisar(Origen.Extremo, Destino.Extremo, discos, LargoOrigen(), Ajustando);
+            if (problemas.Count == 0 && Ajustando)
+            {
+                try
+                {
+                    _ = PlanDiscos();
+                }
+                catch (InvalidOperationException error)
+                {
+                    return [error.Message];
+                }
+            }
+
+            return problemas;
+        }
+    }
+
+    /// <summary>Cómo quedará cada partición en el destino, con palabras: "Datos (NTFS) C: · 930 GB → 238 GB · se copian sus archivos".</summary>
+    public IReadOnlyList<string> Plan
+    {
+        get
+        {
+            try
+            {
+                return Ajustando ? PlanDiscos().Select(Describir).ToList() : [];
+            }
+            catch (InvalidOperationException)
+            {
+                return [];
+            }
+        }
+    }
+
+    private IReadOnlyList<ParticionPlaneada> PlanDiscos() => ClonadoInteligente.Planear(
+        discos.Single(disco => disco.Numero == Origen!.Extremo.NumeroDisco), discos.Single(disco => disco.Numero == Destino!.Extremo.NumeroDisco));
+
+    private static string Describir(ParticionPlaneada planeada) => string.Join(" · ", new[]
+    {
+        $"{planeada.Origen.Titulo}: {planeada.Origen.Tipo}{(planeada.Origen.Letra is { } letra ? $" {letra}" : string.Empty)}",
+        planeada.Modo == ModoParticion.Exacta ? Formatos.Tamano(planeada.Tamano) : $"{Formatos.Tamano(planeada.Origen.Tamano)} → {Formatos.Tamano(planeada.Tamano)}",
+        planeada.Modo switch
+        {
+            ModoParticion.Agrandar => "se copia y se agranda",
+            ModoParticion.Archivos => $"se copian sus archivos ({Formatos.Tamano(planeada.Origen.Usado)} ocupados)",
+            _ => "copia exacta",
+        },
+    });
 
     public string Resumen => Origen is null || Destino is null
         ? "Elige qué clonar (izquierda) y dónde (derecha)."
         : Destino.Extremo is ExtremoClon.DeImagen
             ? $"Se guardará {Origen.Extremo.Describir(discos)} como imagen en {Destino.Titulo}."
-            : $"Se copiará {Origen.Extremo.Describir(discos)} sobre {Destino.Extremo.Describir(discos)}. Todo lo que tenga se borrará.";
+            : Ajustando
+                ? $"Se clonará {Origen.Extremo.Describir(discos)} entero en {Destino.Extremo.Describir(discos)}, con todas sus particiones ajustadas a su tamaño y listo para arrancar en otra PC. Todo lo que tenga el destino se borrará."
+                : $"Se copiará {Origen.Extremo.Describir(discos)} sobre {Destino.Extremo.Describir(discos)}. Todo lo que tenga se borrará.";
 
     [RelayCommand]
     private void Actualizar()
@@ -94,7 +159,7 @@ public sealed partial class ClonarModeloVista(AvisosModeloVista avisos) : Observ
             return;
         }
 
-        var argumentos = $"clonar \"{Origen.Extremo.Texto}\" \"{Destino.Extremo.Texto}\"{(Verificar ? string.Empty : " --sin-verificar")}";
+        var argumentos = $"clonar \"{Origen.Extremo.Texto}\" \"{Destino.Extremo.Texto}\"{(Verificar ? string.Empty : " --sin-verificar")}{(Ajustando ? " --ajustar" : string.Empty)}";
         try
         {
             // Escribir en un disco entero exige administrador; el resto de Espejo sigue sin serlo (ve las unidades de red).

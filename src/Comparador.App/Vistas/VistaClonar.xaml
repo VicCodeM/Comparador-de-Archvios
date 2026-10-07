@@ -97,7 +97,18 @@
             <Grid>
                 <StackPanel VerticalAlignment="Center" Margin="0,0,280,0">
                     <TextBlock Text="{Binding Resumen}" TextWrapping="Wrap" />
-                    <CheckBox Content="Verificar al terminar (relee el destino y compara la huella SHA-256)" IsChecked="{Binding Verificar}" Margin="0,8,0,0" />
+                    <ItemsControl ItemsSource="{Binding Plan}" Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Style="{StaticResource TextoSecundario}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <CheckBox Content="Ajustar al tamaño del destino y dejarlo arrancable (recomendado para pasar Windows a otro SSD)"
+                              IsChecked="{Binding Ajustar}" Margin="0,8,0,0"
+                              Visibility="{Binding PuedeAjustar, Converter={StaticResource BoolAVisible}}"
+                              ToolTip="Sin marcar: copia exacta sector a sector (el destino debe ser igual o más grande y no se agranda)" />
+                    <CheckBox Content="Verificar al terminar (relee el destino y compara la huella SHA-256)" IsChecked="{Binding Verificar}" Margin="0,4,0,0" />
                 </StackPanel>
                 <ui:Button HorizontalAlignment="Right" VerticalAlignment="Center" Appearance="Primary" Padding="24,10"
                            Content="Clonar" Icon="{ui:SymbolIcon Copy24}" Command="{Binding ClonarCommand}"

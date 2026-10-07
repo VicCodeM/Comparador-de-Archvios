@@ -11,17 +11,18 @@ internal sealed record VolumenWindows(string Ruta, int Disco, long Inicio)
     /// <summary>Sin la barra final: así se abre el volumen en sí y no su carpeta raíz.</summary>
     public string Dispositivo => Ruta.TrimEnd('\\');
 
-    /// <summary>Sistema de archivos y bytes ocupados; null si Windows no lo deja ver (EFI sin permisos, sin formato).</summary>
-    public (string SistemaArchivos, long Usado)? Contenido()
+    /// <summary>Sistema de archivos, etiqueta y bytes ocupados; null si Windows no lo deja ver (EFI sin permisos, sin formato).</summary>
+    public (string SistemaArchivos, string Etiqueta, long Usado)? Contenido()
     {
         var sistema = new StringBuilder(32);
-        if (!GetVolumeInformation(Ruta, null, 0, out _, out _, out _, sistema, sistema.Capacity)
+        var etiqueta = new StringBuilder(64);
+        if (!GetVolumeInformation(Ruta, etiqueta, etiqueta.Capacity, out _, out _, out _, sistema, sistema.Capacity)
             || !GetDiskFreeSpaceEx(Ruta, out _, out var total, out var libre))
         {
             return null;
         }
 
-        return (sistema.ToString(), (long)(total - libre));
+        return (sistema.ToString(), etiqueta.ToString(), (long)(total - libre));
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "GetVolumeInformationW")]

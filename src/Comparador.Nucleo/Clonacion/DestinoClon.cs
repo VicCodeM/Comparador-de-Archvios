@@ -20,7 +20,8 @@ internal interface IDestinoClon : IDisposable
 /// Un disco entero o una partición. Un disco solo acepta trozos de sectores completos: el final de una imagen que no
 /// llena el último sector se completa con ceros.
 /// </summary>
-internal sealed class DestinoDisco(DiscoCrudo disco, long inicio, long capacidad, int sector) : IDestinoClon
+/// <param name="propio">False si el disco se comparte entre varias particiones: lo suelta quien lo abrió.</param>
+internal sealed class DestinoDisco(DiscoCrudo disco, long inicio, long capacidad, int sector, bool propio = true) : IDestinoClon
 {
     public long? Capacidad => capacidad;
 
@@ -53,7 +54,13 @@ internal sealed class DestinoDisco(DiscoCrudo disco, long inicio, long capacidad
 
     public void Terminar() => disco.AvisarCambios();
 
-    public void Dispose() => disco.Dispose();
+    public void Dispose()
+    {
+        if (propio)
+        {
+            disco.Dispose();
+        }
+    }
 
     private int RedondearASector(int largo) => (largo + sector - 1) / sector * sector;
 }

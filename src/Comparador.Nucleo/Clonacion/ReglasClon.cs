@@ -9,7 +9,8 @@ namespace Comparador.Nucleo.Clonacion;
 public static class ReglasClon
 {
     /// <param name="largoOrigen">Null si no se sabe antes de empezar (imagen .xz o .gz): se comprueba al escribir.</param>
-    public static IReadOnlyList<string> Revisar(ExtremoClon origen, ExtremoClon destino, IReadOnlyList<DiscoFisico> discos, long? largoOrigen)
+    /// <param name="ajustar">Disco completo ajustando el tamaño: lo que cabe lo decide el plan según lo ocupado.</param>
+    public static IReadOnlyList<string> Revisar(ExtremoClon origen, ExtremoClon destino, IReadOnlyList<DiscoFisico> discos, long? largoOrigen, bool ajustar = false)
     {
         var problemas = new List<string>();
         var tramoOrigen = origen.Tramo(discos);
@@ -45,8 +46,13 @@ public static class ReglasClon
             problemas.Add("La imagen se guardaría dentro del mismo disco que se está leyendo. Guárdala en otro disco.");
         }
 
+        if (ajustar && (origen is not ExtremoClon.DeDisco || destino is not ExtremoClon.DeDisco))
+        {
+            problemas.Add("Ajustar el tamaño solo sirve de un disco entero a otro disco entero.");
+        }
+
         var largo = tramoOrigen?.Largo ?? largoOrigen;
-        if (largo is { } necesario && tramoDestino is { } espacio && necesario > espacio.Largo)
+        if (!ajustar && largo is { } necesario && tramoDestino is { } espacio && necesario > espacio.Largo)
         {
             problemas.Add($"No cabe: el origen mide {Formatos.Tamano(necesario)} y el destino {Formatos.Tamano(espacio.Largo)}.");
         }

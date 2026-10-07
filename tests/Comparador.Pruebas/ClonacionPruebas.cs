@@ -168,6 +168,18 @@ public sealed class ClonacionPruebas : IDisposable
         Assert.Contains(ReglasClon.Revisar(new ExtremoClon.DeDisco(2), new ExtremoClon.DeDisco(1), Discos, null), problema => problema.StartsWith("No cabe"));
 
     [Fact]
+    public void Ajustando_el_tamano_un_disco_mas_pequeno_no_se_rechaza_por_su_tamano_total() =>
+        Assert.Empty(ReglasClon.Revisar(new ExtremoClon.DeDisco(2), new ExtremoClon.DeDisco(1), Discos, null, ajustar: true));
+
+    [Fact]
+    public void Ajustar_el_tamano_solo_vale_de_disco_entero_a_disco_entero() =>
+        Assert.NotEmpty(ReglasClon.Revisar(new ExtremoClon.DeParticion(2, 1), new ExtremoClon.DeDisco(1), Discos, null, ajustar: true));
+
+    [Fact]
+    public void Ajustando_tampoco_deja_escribir_sobre_el_disco_de_Windows() =>
+        Assert.Contains(ReglasClon.Revisar(new ExtremoClon.DeDisco(1), new ExtremoClon.DeDisco(0), Discos, null, ajustar: true), problema => problema.Contains("Windows"));
+
+    [Fact]
     public void No_deja_guardar_la_imagen_dentro_del_disco_que_se_lee() =>
         Assert.NotEmpty(ReglasClon.Revisar(new ExtremoClon.DeDisco(1), new ExtremoClon.DeImagen(@"E:\copia.img"), Discos, null));
 

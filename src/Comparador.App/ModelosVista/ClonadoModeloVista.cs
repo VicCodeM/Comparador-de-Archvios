@@ -16,6 +16,7 @@ public sealed partial class ClonadoModeloVista : ObservableObject
     private readonly ExtremoClon origen;
     private readonly ExtremoClon destino;
     private readonly bool verificar;
+    private readonly bool ajustar;
     private readonly CancellationTokenSource cancelacion = new();
 
     [ObservableProperty] private string fase = "Preparando...";
@@ -28,11 +29,13 @@ public sealed partial class ClonadoModeloVista : ObservableObject
     [ObservableProperty] private string resumen = string.Empty;
     [ObservableProperty] private InfoBarSeverity severidad = InfoBarSeverity.Success;
 
-    public ClonadoModeloVista(ExtremoClon origen, ExtremoClon destino, bool verificar)
+    /// <param name="ajustar">Disco completo ajustando el tamaño y dejándolo arrancable, en vez de la copia exacta.</param>
+    public ClonadoModeloVista(ExtremoClon origen, ExtremoClon destino, bool verificar, bool ajustar)
     {
         this.origen = origen;
         this.destino = destino;
         this.verificar = verificar;
+        this.ajustar = ajustar;
         var discos = ListadoDiscos.Leer();
         DeDonde = origen.Describir(discos);
         HaciaDonde = destino.Describir(discos);
@@ -50,6 +53,13 @@ public sealed partial class ClonadoModeloVista : ObservableObject
         try
         {
             using var suspension = PrevencionSuspension.Activar();
+            if (ajustar && origen.NumeroDisco is { } deDisco && destino.NumeroDisco is { } aDisco)
+            {
+                var duracion = await ClonadoInteligente.ClonarAsync(deDisco, aDisco, verificar, new Progress<AvanceClonado>(MostrarPaso), cancelacion.Token);
+                Terminar(InfoBarSeverity.Success, $"Listo en {Formatos.Duracion(duracion)}: el disco está clonado con todas sus particiones. Ya puedes conectarlo en la otra PC.");
+                return;
+            }
+
             var resultado = await MotorClon.ClonarAsync(origen, destino, verificar, progreso, cancelacion.Token);
             Terminar(InfoBarSeverity.Success, $"Listo: {Formatos.Tamano(resultado.Bytes)} en {Formatos.Duracion(resultado.Duracion)}"
                 + (resultado.Verificado ? ", verificado con SHA-256." : " (sin verificar)."));
@@ -82,8 +92,32 @@ public sealed partial class ClonadoModeloVista : ObservableObject
             : string.Empty;
     }
 
+    private void MostrarPaso(AvanceClonado avance)
+    {
+        Fase = avance.Paso;
+        Indeterminado = avance.Fraccion is null;
+        Porcentaje = (avance.Fraccion ?? 0) * 100;
+        Detalle = avance.Detalle;
+        Velocidad = string.Empty;
+        Restante = string.Empty;
+    }
+
+    /// <summary>Cada clonado deja su resultado en %LocalAppData%\VMSofts\Espejo\clonados.log: si algo falla, ahí está el porqué.</summary>
+    private static readonly string Registro = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VMSofts", "Espejo", "clonados.log");
+
     private void Terminar(InfoBarSeverity severidad, string texto)
     {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Registro)!);
+            File.AppendAllText(Registro, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{severidad}] {DeDonde} -> {HaciaDonde}{(ajustar ? " (ajustando)" : string.Empty)}: {texto}{Environment.NewLine}");
+        }
+        catch (IOException)
+        {
+            // Sin registro se pierde el detalle, no el clonado: el resultado se ve igual en la ventanita.
+        }
+
         Severidad = severidad;
         Resumen = texto;
         Terminado = true;

@@ -25,7 +25,8 @@ public sealed record Particion(
     bool Activa = false,
     string? Volumen = null,
     string? SistemaArchivos = null,
-    long? Usado = null)
+    long? Usado = null,
+    string Etiqueta = "")
 {
     public static readonly Guid TipoDatosGpt = new("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7");
 

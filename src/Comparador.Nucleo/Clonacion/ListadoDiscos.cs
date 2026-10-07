@@ -123,7 +123,7 @@ public static class ListadoDiscos
                 particiones.Add(new Particion(
                     BitConverter.ToInt32(respuesta, entrada + 24), inicio, tamano, ConFormato(tipo, contenido?.SistemaArchivos), letra,
                     tipoGpt, tipoMbr, esGpt ? BitConverter.ToUInt64(respuesta, entrada + 64) : 0, !esGpt && respuesta[entrada + 33] != 0,
-                    volumen?.Ruta, contenido?.SistemaArchivos, contenido?.Usado));
+                    volumen?.Ruta, contenido?.SistemaArchivos, contenido?.Usado, contenido?.Etiqueta ?? string.Empty));
             }
         }
 
