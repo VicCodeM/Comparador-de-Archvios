@@ -67,3 +67,4 @@ $RECYCLE.BIN/
 
 # Carpeta que empaqueta el instalador
 /publicar/
+/instalador/salida/

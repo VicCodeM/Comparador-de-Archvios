@@ -29,6 +29,14 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args is ["--instalar", var opcion])
+        {
+            // Lo llama el instalador con las casillas marcadas: apuntan a este Espejo.exe, el ya instalado.
+            Instalar(opcion);
+            Shutdown();
+            return;
+        }
+
         if (e.Args is ["clonar", var origen, var destino, ..])
         {
             Clonar(origen, destino, verificar: !e.Args.Contains("--sin-verificar"), ajustar: e.Args.Contains("--ajustar"));
@@ -54,6 +62,20 @@ public partial class App : Application
         else if (residente is null || e.Args is not [ModoResidente.Argumento])
         {
             MostrarPrincipal();
+        }
+    }
+
+    /// <summary>"menu": clic derecho y menú del arrastre. "pegar": Ctrl+V del Explorador con Espejo y arranque con Windows.</summary>
+    private static void Instalar(string opcion)
+    {
+        if (opcion == "menu")
+        {
+            IntegracionExplorador.Instalar();
+        }
+        else if (opcion == "pegar")
+        {
+            (Configuracion.Cargar() with { PegarConEspejo = true }).Guardar();
+            ModoResidente.ArrancarConWindows(true);
         }
     }
 
