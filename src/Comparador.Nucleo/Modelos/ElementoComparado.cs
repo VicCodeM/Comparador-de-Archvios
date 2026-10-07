@@ -37,6 +37,9 @@ public sealed class ElementoComparado : INotifyPropertyChanged
 
     public DateTime? FechaDestino { get; set; }
 
+    /// <summary>La última copia de este archivo falló (huella distinta tras 3 intentos, en uso, sin espacio...).</summary>
+    public bool CopiaFallida { get; set; }
+
     public string Nombre => Path.GetFileName(RutaRelativa);
 
     /// <summary>La carpeta donde está, relativa a la raíz ("" si está en la raíz).</summary>

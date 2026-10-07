@@ -131,8 +131,23 @@ public sealed partial class RevisionModeloVista : ObservableObject
         Visibles = todos
             .Where(CumpleFiltro)
             .Where(e => texto.Length == 0 || e.RutaRelativa.Contains(texto, StringComparison.CurrentCultureIgnoreCase))
+            .OrderBy(Prioridad)
             .ToList();
     }
+
+    /// <summary>
+    /// Lo que pide atención va arriba, para verlo sin buscar: lo que falló al copiar, lo que no se pudo leer, lo que
+    /// tiene distinto contenido, lo que falta, lo que sobra y al final lo igual. Dentro de cada grupo, el orden de carpetas.
+    /// </summary>
+    public static int Prioridad(ElementoComparado elemento) => elemento switch
+    {
+        { CopiaFallida: true } => 0,
+        { Estado: EstadoElemento.SinAcceso or EstadoElemento.Error } => 1,
+        { Estado: EstadoElemento.Diferente } => 2,
+        { Estado: EstadoElemento.Falta } => 3,
+        { Estado: EstadoElemento.Sobra } => 4,
+        _ => 5,
+    };
 
     private bool CumpleFiltro(ElementoComparado elemento) => Filtro switch
     {

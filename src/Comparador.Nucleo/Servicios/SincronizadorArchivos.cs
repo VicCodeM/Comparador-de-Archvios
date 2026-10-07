@@ -215,6 +215,7 @@ public sealed class SincronizadorArchivos
         elemento.Estado = EstadoElemento.Coincide;
         elemento.Seleccionado = false;
         elemento.Motivo = motivo;
+        elemento.CopiaFallida = false;
         resumen.ContarCopiado();
     }
 
@@ -229,6 +230,7 @@ public sealed class SincronizadorArchivos
     private static void MarcarFallido(ElementoComparado elemento, Exception error, ResumenSincronizacion resumen)
     {
         elemento.Motivo = "No se pudo copiar: " + DescribirError(error);
+        elemento.CopiaFallida = true;
         resumen.Fallidos.Add(elemento);
     }
 

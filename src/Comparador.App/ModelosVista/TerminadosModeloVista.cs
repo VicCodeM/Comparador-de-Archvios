@@ -94,12 +94,13 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
 
     partial void OnBusquedaChanged(string value) => Refrescar();
 
-    /// <summary>Lo más reciente arriba.</summary>
+    /// <summary>Los que fallaron siempre arriba, con su motivo, para no tener que buscarlos; después, lo más reciente.</summary>
     private void Refrescar()
     {
         var texto = Busqueda.Trim();
         var coinciden = Enumerable.Range(0, todos.Count)
             .Select(i => todos[todos.Count - 1 - i])
+            .OrderBy(fila => fila.Resultado != ResultadoArchivo.Fallido)
             .Where(CumpleFiltro)
             .Where(fila => texto.Length == 0 || fila.Nombre.Contains(texto, StringComparison.CurrentCultureIgnoreCase)
                 || fila.Carpeta.Contains(texto, StringComparison.CurrentCultureIgnoreCase));

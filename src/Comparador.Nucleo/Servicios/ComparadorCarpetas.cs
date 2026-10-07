@@ -36,7 +36,7 @@ public sealed class ComparadorCarpetas
         if (porContenido.Count > 0)
         {
             progreso.Hilos = Concurrencia.Decidir(opciones.HilosManuales, ubicaciones);
-            await CompararContenidoAsync(porContenido, progreso, cancelacion);
+            await CompararContenidoAsync(porContenido, opciones.ToleranciaFecha, progreso, cancelacion);
         }
 
         return new ResultadoComparacion { Elementos = elementos, Duracion = reloj.Elapsed };
@@ -175,7 +175,7 @@ public sealed class ComparadorCarpetas
         var diferencia = (origen.FechaModificacion - destino.FechaModificacion).Duration();
 
         return diferencia > opciones.ToleranciaFecha
-            ? (EstadoElemento.Diferente, "Mismo tamaño pero distinta fecha de modificación")
+            ? (EstadoElemento.Diferente, ExplicacionDiferencia.PorFecha(origen.FechaModificacion, destino.FechaModificacion, opciones.ToleranciaFecha))
             : (EstadoElemento.Coincide, string.Empty);
     }
 
@@ -190,14 +190,15 @@ public sealed class ComparadorCarpetas
         Motivo = destino.SinAcceso ? "Sin permiso para leer esta carpeta en el destino" : "Solo existe en el destino",
     };
 
-    private static async Task CompararContenidoAsync(List<ElementoComparado> elementos, ProgresoOperacion progreso, CancellationToken cancelacion)
+    private static async Task CompararContenidoAsync(
+        List<ElementoComparado> elementos, TimeSpan tolerancia, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         progreso.IniciarFase("Comparando el contenido (SHA-256)", elementos.Count, elementos.Sum(e => 2 * e.TamanoACopiar));
         var opciones = new ParallelOptions { MaxDegreeOfParallelism = progreso.Hilos.Hilos, CancellationToken = cancelacion };
         await Parallel.ForEachAsync(elementos, opciones, async (elemento, token) =>
         {
             var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Leyendo el origen", elemento.RutaOrigen, elemento.RutaDestino);
-            (elemento.Estado, elemento.Motivo) = await CompararHuellasAsync(elemento, archivo, progreso, token);
+            (elemento.Estado, elemento.Motivo) = await CompararHuellasAsync(elemento, tolerancia, archivo, progreso, token);
             elemento.Seleccionado = true;
             progreso.AjustarBytes(archivo, 2 * elemento.TamanoACopiar);
             progreso.Terminar(archivo, elemento.Estado == EstadoElemento.Error ? ResultadoArchivo.Fallido : ResultadoArchivo.Copiado, elemento.Motivo);
@@ -205,7 +206,7 @@ public sealed class ComparadorCarpetas
     }
 
     private static async Task<(EstadoElemento, string)> CompararHuellasAsync(
-        ElementoComparado elemento, ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
+        ElementoComparado elemento, TimeSpan tolerancia, ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         try
         {
@@ -217,7 +218,7 @@ public sealed class ComparadorCarpetas
 
             return huellaOrigen == huellaDestino
                 ? (EstadoElemento.Coincide, "Contenido idéntico (SHA-256)")
-                : (EstadoElemento.Diferente, "Mismo tamaño pero distinto contenido (SHA-256)");
+                : (EstadoElemento.Diferente, ExplicacionDiferencia.PorHuella(elemento.FechaOrigen, elemento.FechaDestino, tolerancia));
         }
         catch (IOException) when (!cancelacion.IsCancellationRequested)
         {
