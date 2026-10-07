@@ -50,6 +50,12 @@ public static class CopiaSegura
             {
                 throw new ArchivoEnUsoException(DetectorBloqueos.Describir(RutaLocal(origen, relativa), RutaLocal(destino, relativaDestino)), error);
             }
+            catch (CopiaNoIdenticaException) when (intento < Reintentos)
+            {
+                // Un tropiezo de un cable USB o de la red se arregla copiando otra vez; tres fallos seguidos ya son el
+                // disco o la memoria, y entonces sí se avisa. El destino nunca se tocó: la copia mala era el temporal.
+                archivo.Reiniciar($"La copia no salió idéntica, reintento {intento + 1} de {Reintentos}");
+            }
         }
     }
 

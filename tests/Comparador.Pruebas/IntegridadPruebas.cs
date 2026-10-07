@@ -4,10 +4,15 @@ using Comparador.Nucleo.Ubicaciones;
 
 namespace Comparador.Pruebas;
 
-/// <summary>Un destino que estropea un byte de lo que escribe: simula un cable USB o una red que corrompen datos.</summary>
-internal sealed class DestinoQueCorrompe(string raiz) : IUbicacion
+/// <summary>
+/// Un destino que estropea un byte de lo que escribe: simula un cable USB o una red que corrompen datos. Con
+/// <paramref name="veces"/> solo falla las primeras escrituras, como un tropiezo pasajero.
+/// </summary>
+internal sealed class DestinoQueCorrompe(string raiz, int veces = int.MaxValue) : IUbicacion
 {
     private readonly UbicacionDisco disco = new(raiz);
+
+    public int Escrituras { get; private set; }
 
     public string Raiz => disco.Raiz;
 
@@ -32,7 +37,11 @@ internal sealed class DestinoQueCorrompe(string raiz) : IUbicacion
         using var memoria = new MemoryStream();
         await contenido.CopyToAsync(memoria, cancelacion);
         var bytes = memoria.ToArray();
-        bytes[bytes.Length / 2] ^= 0xFF;
+        if (++Escrituras <= veces)
+        {
+            bytes[bytes.Length / 2] ^= 0xFF;
+        }
+
         await disco.EscribirAsync(relativa, new MemoryStream(bytes), cancelacion);
     }
 
@@ -64,6 +73,28 @@ public sealed class IntegridadPruebas : IDisposable
         await Assert.ThrowsAsync<CopiaNoIdenticaException>(() => Copiar(new DestinoQueCorrompe(carpetas.Destino), "foto.jpg", verificar: true));
 
         Assert.Equal("la version anterior, intacta", File.ReadAllText(destino));
+        Assert.Empty(Directory.GetFiles(carpetas.Destino, "*" + CopiaSegura.ExtensionTemporal));
+    }
+
+    [Fact]
+    public async Task Si_la_copia_sale_corrupta_lo_intenta_tres_veces_antes_de_rendirse()
+    {
+        CarpetasDePrueba.Escribir(carpetas.Origen, "foto.jpg", new string('x', 10_000));
+        var destino = new DestinoQueCorrompe(carpetas.Destino);
+
+        await Assert.ThrowsAsync<CopiaNoIdenticaException>(() => Copiar(destino, "foto.jpg", verificar: true));
+
+        Assert.Equal(3, destino.Escrituras);
+    }
+
+    [Fact]
+    public async Task Un_tropiezo_pasajero_se_arregla_reintentando_y_la_copia_queda_identica()
+    {
+        var origen = CarpetasDePrueba.Escribir(carpetas.Origen, "foto.jpg", new string('x', 10_000));
+
+        await Copiar(new DestinoQueCorrompe(carpetas.Destino, veces: 2), "foto.jpg", verificar: true);
+
+        Assert.Equal(File.ReadAllBytes(origen), File.ReadAllBytes(Path.Combine(carpetas.Destino, "foto.jpg")));
         Assert.Empty(Directory.GetFiles(carpetas.Destino, "*" + CopiaSegura.ExtensionTemporal));
     }
 
