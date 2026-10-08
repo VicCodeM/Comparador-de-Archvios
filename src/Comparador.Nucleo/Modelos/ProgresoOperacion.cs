@@ -149,6 +149,9 @@ public sealed class ProgresoOperacion
         reloj.Restart();
     }
 
+    /// <summary>Corrige el total de bytes cuando un archivo acaba necesitando más o menos pasadas de las previstas.</summary>
+    public void SumarAlTotal(long bytes) => Interlocked.Add(ref bytesTotal, bytes);
+
     public void Avanzar(long elementos = 1) => Interlocked.Add(ref procesados, elementos);
 
     public void SumarBytes(long bytes) => Interlocked.Add(ref bytesProcesados, bytes);

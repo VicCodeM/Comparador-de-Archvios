@@ -136,4 +136,27 @@ public sealed class ControlCopiaPruebas : IDisposable
         Assert.Equal(1, resumen.Copiados);
         Assert.Equal(new FileInfo(Path.Combine(carpetas.Origen, "grande.bin")).Length, new FileInfo(Destino("grande.bin")).Length);
     }
+
+    /// <summary>
+    /// Victor apagaba "Verificar" con la copia en marcha y seguía verificando (2026-10-08): lo que aún no empezó debe
+    /// tomar el valor nuevo, y la barra debe acabar justo en el 100 % aunque el total se calculó con el valor viejo.
+    /// </summary>
+    [Fact]
+    public async Task Apagar_la_verificacion_en_marcha_vale_para_lo_que_falta_y_la_barra_cierra_en_100()
+    {
+        CarpetasDePrueba.Escribir(carpetas.Origen, "a.txt", "uno");
+        CarpetasDePrueba.Escribir(carpetas.Origen, "b.txt", "dos");
+        var opciones = new OpcionesCopia { Verificar = true, HilosManuales = 1 };
+
+        var (_, progreso) = await Copiar(opciones, enPausa =>
+        {
+            EsperarQueEmpiece(enPausa, "a.txt");
+            opciones.Verificar = false;
+            enPausa.Reanudar();
+        });
+
+        Assert.All(progreso.TomarTerminados(), terminado => Assert.Equal("Copiado", terminado.Mensaje));
+        var final = progreso.Instantanea();
+        Assert.Equal(final.BytesTotal, final.BytesProcesados);
+    }
 }

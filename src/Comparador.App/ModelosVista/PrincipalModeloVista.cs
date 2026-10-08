@@ -49,6 +49,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     private ProgresoOperacion? enMarcha;
     private Configuracion config;
     private bool cargando;
+    private OpcionesCopia? opcionesEnCurso;
 
     [ObservableProperty] private Pagina paginaActual = Pagina.Ubicaciones;
     [ObservableProperty] private Operacion operacionActual = Operacion.Ninguna;
@@ -226,7 +227,16 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Guardar();
     }
 
-    partial void OnVerificarCopiasChanged(bool value) => Guardar();
+    /// <summary>Se guarda y, si hay una copia en marcha, vale para los archivos que todavía no empezaron.</summary>
+    partial void OnVerificarCopiasChanged(bool value)
+    {
+        if (opcionesEnCurso is not null)
+        {
+            opcionesEnCurso.Verificar = value;
+        }
+
+        Guardar();
+    }
 
     partial void OnSiYaExisteChanged(ReglaConflicto value) => Guardar();
 
@@ -463,7 +473,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         using var suspension = PrevencionSuspension.Activar();
         try
         {
-            var opciones = new OpcionesCopia
+            var opciones = opcionesEnCurso = new OpcionesCopia
             {
                 Verificar = VerificarCopias,
                 HilosManuales = HilosAutomaticos ? null : (int)Hilos,

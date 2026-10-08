@@ -23,6 +23,7 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
 {
     private readonly CancellationTokenSource cancelacion = new();
     private ProgresoOperacion? enMarcha;
+    private OpcionesCopia? opcionesEnCurso;
 
     [ObservableProperty] private EstadoTrabajo estado = EstadoTrabajo.EnCola;
     [ObservableProperty] private bool enPausa;
@@ -68,7 +69,16 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
         AlTerminar == AlTerminar.Nada ? string.Empty : "al terminar: " + AccionAlTerminar.Nombre(AlTerminar).ToLowerInvariant(),
     }.Where(parte => parte.Length > 0));
 
-    partial void OnVerificarChanged(bool value) => OnPropertyChanged(nameof(DescripcionOpciones));
+    /// <summary>Con la copia en marcha vale para los archivos que todavía no empezaron.</summary>
+    partial void OnVerificarChanged(bool value)
+    {
+        if (opcionesEnCurso is not null)
+        {
+            opcionesEnCurso.Verificar = value;
+        }
+
+        OnPropertyChanged(nameof(DescripcionOpciones));
+    }
 
     partial void OnSiYaExisteChanged(ReglaConflicto value) => OnPropertyChanged(nameof(DescripcionOpciones));
 
@@ -101,7 +111,7 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
         using var suspension = PrevencionSuspension.Activar();
         try
         {
-            var opciones = new OpcionesCopia { Verificar = Verificar, HilosManuales = HilosManuales, SiYaExiste = SiYaExiste };
+            var opciones = opcionesEnCurso = new OpcionesCopia { Verificar = Verificar, HilosManuales = HilosManuales, SiYaExiste = SiYaExiste };
             var resultado = await TrabajoCopia.EjecutarAsync(Pedido, opciones, progreso, cancelacion.Token);
             Severidad = resultado.Fallidos.IsEmpty ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
             Resumen = DescribirResumen(resultado, reloj.Elapsed);

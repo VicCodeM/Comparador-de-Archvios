@@ -43,7 +43,8 @@ public sealed class SincronizadorArchivos
         var ubicaciones = pendientes.Select(elemento => elemento.Par).Distinct()
             .ToDictionary(par => par, par => (Origen: CatalogoUbicaciones.Abrir(par.Origen), Destino: CatalogoUbicaciones.Abrir(par.Destino)));
         progreso.Hilos = Concurrencia.Decidir(opciones.HilosManuales, ubicaciones.Values.SelectMany(par => new[] { par.Origen, par.Destino }));
-        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], opciones.Verificar)));
+        var verificarAlEmpezar = opciones.Verificar;
+        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], verificarAlEmpezar)));
         var resumen = new ResumenSincronizacion();
         CrearCarpetas(pendientes.Where(elemento => elemento.EsCarpeta), ubicaciones, progreso, resumen, cancelacion);
         var limite = new LimiteDinamico(progreso.Hilos.Hilos);
@@ -57,7 +58,7 @@ public sealed class SincronizadorArchivos
                 await limite.EsperarAsync(token);
                 try
                 {
-                    await CopiarAsync(archivo, ubicaciones[archivo.Par], opciones, progreso, resumen, token);
+                    await CopiarAsync(archivo, ubicaciones[archivo.Par], opciones, verificarAlEmpezar, progreso, resumen, token);
                 }
                 finally
                 {
@@ -130,9 +131,10 @@ public sealed class SincronizadorArchivos
     }
 
     private static async Task CopiarAsync(
-        ElementoComparado elemento, (IUbicacion Origen, IUbicacion Destino) par, OpcionesCopia opciones,
+        ElementoComparado elemento, (IUbicacion Origen, IUbicacion Destino) par, OpcionesCopia opciones, bool verificarAlEmpezar,
         ProgresoOperacion progreso, ResumenSincronizacion resumen, CancellationToken cancelacion)
     {
+        var verificar = verificarAlEmpezar;
         var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando", elemento.RutaOrigen, elemento.RutaDestino, cancelacion);
         var resultado = ResultadoArchivo.Fallido;
         try
@@ -141,6 +143,8 @@ public sealed class SincronizadorArchivos
             archivo.Etapa = "En pausa";
             await progreso.EsperarSiPausadoAsync(archivo.Cancelacion);
             archivo.Etapa = "Copiando";
+            // Se lee al empezar este archivo (tras la pausa): si se cambió con la copia en marcha, vale desde aquí.
+            verificar = opciones.Verificar;
             if (MotivoParaNoTocar(elemento, opciones.SiYaExiste) is { } motivo)
             {
                 MarcarSaltado(elemento, motivo, resumen);
@@ -151,8 +155,8 @@ public sealed class SincronizadorArchivos
             var relativaDestino = opciones.SiYaExiste == ReglaConflicto.ConservarAmbos && elemento.Estado == EstadoElemento.Diferente
                 ? NombreLibre(par.Destino, elemento.RutaRelativa)
                 : elemento.RutaRelativa;
-            await CopiaSegura.CopiarAsync(par.Origen, par.Destino, elemento.RutaRelativa, relativaDestino, opciones.Verificar, archivo, progreso, archivo.Cancelacion);
-            var hecho = opciones.Verificar ? "Copiado y verificado (SHA-256)" : "Copiado";
+            await CopiaSegura.CopiarAsync(par.Origen, par.Destino, elemento.RutaRelativa, relativaDestino, verificar, archivo, progreso, archivo.Cancelacion);
+            var hecho = verificar ? "Copiado y verificado (SHA-256)" : "Copiado";
             MarcarCopiado(elemento, relativaDestino == elemento.RutaRelativa ? hecho : $"{hecho} como {Path.GetFileName(relativaDestino)}", resumen);
             resultado = ResultadoArchivo.Copiado;
         }
@@ -172,7 +176,9 @@ public sealed class SincronizadorArchivos
         }
         finally
         {
-            progreso.AjustarBytes(archivo, BytesEsperados(elemento, par, opciones.Verificar));
+            // Si la verificación se cambió con la copia en marcha, el total contaba otras pasadas para este archivo.
+            progreso.SumarAlTotal(BytesEsperados(elemento, par, verificar) - BytesEsperados(elemento, par, verificarAlEmpezar));
+            progreso.AjustarBytes(archivo, BytesEsperados(elemento, par, verificar));
             progreso.Terminar(archivo, resultado, cancelacion.IsCancellationRequested && resultado == ResultadoArchivo.Fallido ? "Cancelado" : elemento.Motivo);
         }
     }

@@ -27,15 +27,15 @@ public partial class VentanaCopia
     private TrabajoCopiaModeloVista Trabajo => (TrabajoCopiaModeloVista)DataContext;
 
     /// <summary>
-    /// El menú "⋯" se arma al abrirlo, con la opción vigente marcada. Lo de "si ya existe" y "verificar" vale para
-    /// las copias que aún no empezaron; "al terminar" se puede cambiar en cualquier momento.
+    /// El menú "⋯" se arma al abrirlo, con la opción vigente marcada. "Si ya existe" vale para las copias que aún no
+    /// empezaron; "verificar" y "al terminar" se pueden cambiar en cualquier momento.
     /// </summary>
     private void AbrirOpciones(object sender, RoutedEventArgs e)
     {
         MenuOpciones.Items.Clear();
         MenuOpciones.Items.Add(Submenu("Si el archivo ya existe", Trabajo.Reglas, regla => regla == Trabajo.SiYaExiste,
             regla => Trabajo.SiYaExiste = regla, Convertidores.ReglaTextoConverter.Texto, !Trabajo.EnCola));
-        var verificar = new MenuItem { Header = "Verificar cada copia (SHA-256)", IsCheckable = true, IsChecked = Trabajo.Verificar, IsEnabled = Trabajo.EnCola };
+        var verificar = new MenuItem { Header = "Verificar cada copia (SHA-256)", IsCheckable = true, IsChecked = Trabajo.Verificar };
         verificar.Click += (_, _) => Trabajo.Verificar = verificar.IsChecked;
         MenuOpciones.Items.Add(verificar);
         MenuOpciones.Items.Add(new Separator());

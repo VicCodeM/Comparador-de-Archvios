@@ -18,8 +18,11 @@ public enum ReglaConflicto
 
 public sealed record OpcionesCopia
 {
-    /// <summary>Releer origen y copia y comparar sus huellas SHA-256 antes de dar el archivo por bueno.</summary>
-    public bool Verificar { get; init; } = true;
+    /// <summary>
+    /// Releer origen y copia y comparar sus huellas SHA-256 antes de dar el archivo por bueno. Se puede cambiar con la
+    /// copia en marcha: cada archivo lo lee al empezar (Victor lo apagaba a mitad de copia y seguía verificando).
+    /// </summary>
+    public volatile bool Verificar = true;
 
     /// <summary>Copias a la vez fijadas a mano, o null para que se ajusten solas midiendo la velocidad.</summary>
     public int? HilosManuales { get; init; }
