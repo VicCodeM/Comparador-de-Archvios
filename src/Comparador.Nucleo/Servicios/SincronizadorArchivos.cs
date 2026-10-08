@@ -43,8 +43,7 @@ public sealed class SincronizadorArchivos
         var ubicaciones = pendientes.Select(elemento => elemento.Par).Distinct()
             .ToDictionary(par => par, par => (Origen: CatalogoUbicaciones.Abrir(par.Origen), Destino: CatalogoUbicaciones.Abrir(par.Destino)));
         progreso.Hilos = Concurrencia.Decidir(opciones.HilosManuales, ubicaciones.Values.SelectMany(par => new[] { par.Origen, par.Destino }));
-        var verificarAlEmpezar = opciones.Verificar;
-        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => BytesEsperados(archivo, ubicaciones[archivo.Par], verificarAlEmpezar)));
+        progreso.IniciarFase("Copiando", pendientes.Count, archivos.Sum(archivo => archivo.TamanoACopiar));
         var resumen = new ResumenSincronizacion();
         CrearCarpetas(pendientes.Where(elemento => elemento.EsCarpeta), ubicaciones, progreso, resumen, cancelacion);
         var limite = new LimiteDinamico(progreso.Hilos.Hilos);
@@ -58,7 +57,7 @@ public sealed class SincronizadorArchivos
                 await limite.EsperarAsync(token);
                 try
                 {
-                    await CopiarAsync(archivo, ubicaciones[archivo.Par], opciones, verificarAlEmpezar, progreso, resumen, token);
+                    await CopiarAsync(archivo, ubicaciones[archivo.Par], opciones, progreso, resumen, token);
                 }
                 finally
                 {
@@ -105,9 +104,6 @@ public sealed class SincronizadorArchivos
         }
     }
 
-    private static long BytesEsperados(ElementoComparado archivo, (IUbicacion Origen, IUbicacion Destino) par, bool verificar) =>
-        archivo.TamanoACopiar * CopiaSegura.Pasadas(par.Origen, par.Destino, verificar);
-
     private static void CrearCarpetas(
         IEnumerable<ElementoComparado> carpetas, Dictionary<ParRutas, (IUbicacion Origen, IUbicacion Destino)> ubicaciones,
         ProgresoOperacion progreso, ResumenSincronizacion resumen, CancellationToken cancelacion)
@@ -131,10 +127,9 @@ public sealed class SincronizadorArchivos
     }
 
     private static async Task CopiarAsync(
-        ElementoComparado elemento, (IUbicacion Origen, IUbicacion Destino) par, OpcionesCopia opciones, bool verificarAlEmpezar,
+        ElementoComparado elemento, (IUbicacion Origen, IUbicacion Destino) par, OpcionesCopia opciones,
         ProgresoOperacion progreso, ResumenSincronizacion resumen, CancellationToken cancelacion)
     {
-        var verificar = verificarAlEmpezar;
         var archivo = progreso.Empezar(elemento.RutaRelativa, elemento.TamanoACopiar, "Copiando", elemento.RutaOrigen, elemento.RutaDestino, cancelacion);
         var resultado = ResultadoArchivo.Fallido;
         try
@@ -144,7 +139,7 @@ public sealed class SincronizadorArchivos
             await progreso.EsperarSiPausadoAsync(archivo.Cancelacion);
             archivo.Etapa = "Copiando";
             // Se lee al empezar este archivo (tras la pausa): si se cambió con la copia en marcha, vale desde aquí.
-            verificar = opciones.Verificar;
+            var verificar = opciones.Verificar;
             if (MotivoParaNoTocar(elemento, opciones.SiYaExiste) is { } motivo)
             {
                 MarcarSaltado(elemento, motivo, resumen);
@@ -176,9 +171,7 @@ public sealed class SincronizadorArchivos
         }
         finally
         {
-            // Si la verificación se cambió con la copia en marcha, el total contaba otras pasadas para este archivo.
-            progreso.SumarAlTotal(BytesEsperados(elemento, par, verificar) - BytesEsperados(elemento, par, verificarAlEmpezar));
-            progreso.AjustarBytes(archivo, BytesEsperados(elemento, par, verificar));
+            progreso.AjustarBytes(archivo, elemento.TamanoACopiar);
             progreso.Terminar(archivo, resultado, cancelacion.IsCancellationRequested && resultado == ResultadoArchivo.Fallido ? "Cancelado" : elemento.Motivo);
         }
     }

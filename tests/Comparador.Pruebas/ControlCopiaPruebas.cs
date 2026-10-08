@@ -159,4 +159,21 @@ public sealed class ControlCopiaPruebas : IDisposable
         var final = progreso.Instantanea();
         Assert.Equal(final.BytesTotal, final.BytesProcesados);
     }
+
+    /// <summary>
+    /// Victor veía un archivo de 500 MB como "1 GB y más" con la verificación encendida (2026-10-08): las relecturas
+    /// se sumaban al total. El total son los datos a copiar, verifique o no.
+    /// </summary>
+    [Fact]
+    public async Task Verificar_no_infla_el_tamano_del_total()
+    {
+        EscribirGrande("grande.bin");
+        var tamano = new FileInfo(Path.Combine(carpetas.Origen, "grande.bin")).Length;
+
+        var (resumen, progreso) = await Copiar(new OpcionesCopia { Verificar = true });
+
+        var final = progreso.Instantanea();
+        Assert.Equal(1, resumen.Copiados);
+        Assert.Equal((tamano, tamano), (final.BytesTotal, final.BytesProcesados));
+    }
 }

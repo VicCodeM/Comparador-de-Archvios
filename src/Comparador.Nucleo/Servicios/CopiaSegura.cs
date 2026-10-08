@@ -74,13 +74,6 @@ public static class CopiaSegura
     private static string RutaLocal(IUbicacion ubicacion, string relativa) =>
         ubicacion.Tipo == TipoUbicacion.Telefono ? string.Empty : Path.Combine(ubicacion.Raiz, relativa);
 
-    /// <summary>
-    /// Cuántas veces se leen los datos del archivo: una al copiar y, si se verifica, el origen y la copia otra vez
-    /// entre discos (o solo la copia por el camino de teléfono, que calcula la huella del origen al copiar).
-    /// </summary>
-    public static int Pasadas(IUbicacion origen, IUbicacion destino, bool verificar) =>
-        !verificar ? 1 : EntreDiscos(origen, destino) is not null ? 3 : 2;
-
     private static (UbicacionDisco Origen, UbicacionDisco Destino)? EntreDiscos(IUbicacion origen, IUbicacion destino) =>
         origen is UbicacionDisco discoOrigen && destino is UbicacionDisco discoDestino ? (discoOrigen, discoDestino) : null;
 
@@ -129,7 +122,7 @@ public static class CopiaSegura
         }
 
         archivo.Reiniciar("Verificando SHA-256");
-        void Sumar(int leidos) => progreso.SumarBytes(archivo, leidos);
+        void Sumar(int leidos) => progreso.SumarVerificacion(archivo, leidos, lecturas: 2);
         string huellaOrigen, huellaCopia;
         if (MismoDiscoMecanico(origen, destino))
         {
@@ -172,7 +165,7 @@ public static class CopiaSegura
         }
 
         archivo.Reiniciar("Verificando SHA-256");
-        var huellaCopia = await CalculadoraHash.CalcularAsync(destino, temporal, leidos => progreso.SumarBytes(archivo, leidos), cancelacion);
+        var huellaCopia = await CalculadoraHash.CalcularAsync(destino, temporal, leidos => progreso.SumarVerificacion(archivo, leidos, lecturas: 1), cancelacion);
         if (huellaCopia != huellaOrigen)
         {
             throw new CopiaNoIdenticaException();

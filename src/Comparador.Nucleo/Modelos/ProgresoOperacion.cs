@@ -30,6 +30,7 @@ public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string ruta
     private readonly CancellationTokenSource propia = CancellationTokenSource.CreateLinkedTokenSource(operacion);
     private long bytes;
     private long acumulado;
+    private long leidosAlVerificar;
 
     /// <summary>Se cancela si se cancela toda la operación o si se salta este archivo.</summary>
     public CancellationToken Cancelacion => propia.Token;
@@ -64,7 +65,15 @@ public sealed class ArchivoEnCurso(string rutaRelativa, long tamano, string ruta
     {
         Etapa = etapa;
         Interlocked.Exchange(ref bytes, 0);
+        Interlocked.Exchange(ref leidosAlVerificar, 0);
     }
+
+    /// <summary>
+    /// Al verificar se leen origen y copia: la fila muestra lo leído entre las lecturas, para que un archivo de 500 MB
+    /// no aparezca como "1 GB de 500 MB". No suma al total ni a lo acumulado: verificar no es copiar datos.
+    /// </summary>
+    internal void SumarVerificacion(long cantidad, int lecturas) =>
+        Interlocked.Exchange(ref bytes, Interlocked.Add(ref leidosAlVerificar, cantidad) / lecturas);
 
     /// <summary>Todo lo que este archivo ha sumado al total, en todas sus etapas y reintentos.</summary>
     public long Acumulado => Interlocked.Read(ref acumulado);
@@ -149,9 +158,6 @@ public sealed class ProgresoOperacion
         reloj.Restart();
     }
 
-    /// <summary>Corrige el total de bytes cuando un archivo acaba necesitando más o menos pasadas de las previstas.</summary>
-    public void SumarAlTotal(long bytes) => Interlocked.Add(ref bytesTotal, bytes);
-
     public void Avanzar(long elementos = 1) => Interlocked.Add(ref procesados, elementos);
 
     public void SumarBytes(long bytes) => Interlocked.Add(ref bytesProcesados, bytes);
@@ -175,6 +181,22 @@ public sealed class ProgresoOperacion
     public void SumarBytes(ArchivoEnCurso archivo, long bytes)
     {
         Contar(archivo, bytes);
+        AtenderPausaYSalto(archivo);
+    }
+
+    /// <summary>
+    /// Lo leído al verificar: avanza la fila del archivo pero no el total. El total son los datos a copiar, no las
+    /// relecturas; antes contaba tres veces cada archivo y 500 MB salían como 1,5 GB.
+    /// </summary>
+    /// <param name="lecturas">Cuántos archivos se leen a la vez para verificar (origen y copia, o solo la copia).</param>
+    public void SumarVerificacion(ArchivoEnCurso archivo, long bytes, int lecturas)
+    {
+        archivo.SumarVerificacion(bytes, lecturas);
+        AtenderPausaYSalto(archivo);
+    }
+
+    private void AtenderPausaYSalto(ArchivoEnCurso archivo)
+    {
         sinPausa.Wait(archivo.Cancelacion);
         archivo.Cancelacion.ThrowIfCancellationRequested();
     }
