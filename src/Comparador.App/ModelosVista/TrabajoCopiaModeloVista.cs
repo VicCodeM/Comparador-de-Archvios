@@ -37,7 +37,7 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
     public TrabajoCopiaModeloVista(PedidoCopia pedido, Configuracion config, AccionesArchivo acciones)
     {
         Pedido = pedido;
-        Verificar = config.VerificarCopias;
+        Verificar = config.VerificarConHuella;
         SiYaExiste = config.SiYaExiste;
         HilosManuales = config.HilosAutomaticos ? null : config.Hilos;
         Terminados = new TerminadosModeloVista(acciones);

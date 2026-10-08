@@ -173,7 +173,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         ModoExacto = config.ModoExacto;
         DetectarSobrantes = config.DetectarSobrantes;
         Exclusiones = config.Exclusiones;
-        VerificarCopias = config.VerificarCopias;
+        VerificarCopias = config.VerificarConHuella;
         Tema = config.Tema;
         HilosAutomaticos = config.HilosAutomaticos;
         Hilos = config.Hilos;
@@ -209,7 +209,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             ModoExacto = ModoExacto,
             DetectarSobrantes = DetectarSobrantes,
             Exclusiones = Exclusiones,
-            VerificarCopias = VerificarCopias,
+            VerificarConHuella = VerificarCopias,
             Tema = Tema,
             HilosAutomaticos = HilosAutomaticos,
             Hilos = (int)Hilos,
@@ -515,9 +515,8 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             partes.Add(Formatos.Cantidad(resumen.Fallidos.Count, "falló", "fallaron"));
         }
 
-        var verificados = VerificarCopias && resumen.Copiados > 0 ? ", verificados con SHA-256" : string.Empty;
-
-        return $"{string.Join(", ", partes)} en {Formatos.Duracion(duracion)}{verificados}."
+        // Cada archivo dice en la lista si quedó verificado: la opción se puede apagar a mitad y aquí no sería cierto.
+        return $"{string.Join(", ", partes)} en {Formatos.Duracion(duracion)}."
             + (resumen.Fallidos.IsEmpty ? string.Empty : " Abajo está el motivo de cada uno.");
     }
 

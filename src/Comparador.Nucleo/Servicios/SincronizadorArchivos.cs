@@ -138,8 +138,6 @@ public sealed class SincronizadorArchivos
             archivo.Etapa = "En pausa";
             await progreso.EsperarSiPausadoAsync(archivo.Cancelacion);
             archivo.Etapa = "Copiando";
-            // Se lee al empezar este archivo (tras la pausa): si se cambió con la copia en marcha, vale desde aquí.
-            var verificar = opciones.Verificar;
             if (MotivoParaNoTocar(elemento, opciones.SiYaExiste) is { } motivo)
             {
                 MarcarSaltado(elemento, motivo, resumen);
@@ -150,8 +148,10 @@ public sealed class SincronizadorArchivos
             var relativaDestino = opciones.SiYaExiste == ReglaConflicto.ConservarAmbos && elemento.Estado == EstadoElemento.Diferente
                 ? NombreLibre(par.Destino, elemento.RutaRelativa)
                 : elemento.RutaRelativa;
-            await CopiaSegura.CopiarAsync(par.Origen, par.Destino, elemento.RutaRelativa, relativaDestino, verificar, archivo, progreso, archivo.Cancelacion);
-            var hecho = verificar ? "Copiado y verificado (SHA-256)" : "Copiado";
+            // Se consulta en cada bloque: apagarla con la copia en marcha vale al instante, también para lo que ya verificaba.
+            var verificada = await CopiaSegura.CopiarAsync(
+                par.Origen, par.Destino, elemento.RutaRelativa, relativaDestino, () => opciones.Verificar, archivo, progreso, archivo.Cancelacion);
+            var hecho = verificada ? "Copiado y verificado (SHA-256)" : "Copiado";
             MarcarCopiado(elemento, relativaDestino == elemento.RutaRelativa ? hecho : $"{hecho} como {Path.GetFileName(relativaDestino)}", resumen);
             resultado = ResultadoArchivo.Copiado;
         }

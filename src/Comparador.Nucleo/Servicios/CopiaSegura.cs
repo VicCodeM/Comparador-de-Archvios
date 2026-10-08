@@ -10,6 +10,9 @@ public sealed class ArchivoEnUsoException(string programas, Exception interna)
 /// <summary>La copia no es idéntica al origen según SHA-256.</summary>
 public sealed class CopiaNoIdenticaException() : IOException("La verificación SHA-256 falló: la copia no es idéntica al origen");
 
+/// <summary>Se apagó la verificación mientras se releía el archivo: la copia se da por buena sin esperar.</summary>
+internal sealed class VerificacionApagadaException() : OperationCanceledException("Se apagó la verificación");
+
 /// <summary>
 /// Copia un archivo sin dejarlo a medias: primero a un temporal junto al destino, calculando el SHA-256 del origen en
 /// esa misma lectura; si se pide, relee el temporal y compara huellas; y solo entonces reemplaza el destino de una vez.
@@ -30,16 +33,20 @@ public static class CopiaSegura
 
     /// <param name="relativa">El archivo en el origen.</param>
     /// <param name="relativaDestino">Dónde queda en el destino: casi siempre la misma ruta, o "nombre (2).ext" si se conservan los dos.</param>
-    public static async Task CopiarAsync(
-        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, bool verificar,
+    /// <param name="verificar">
+    /// Se consulta en cada bloque: apagarlo con la copia en marcha corta al instante la verificación en curso (Victor la
+    /// apagaba y los archivos que ya verificaban seguían haciéndolo hasta el final, 2026-10-08).
+    /// </param>
+    /// <returns>True si la copia quedó verificada con SHA-256.</returns>
+    public static async Task<bool> CopiarAsync(
+        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, Func<bool> verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         for (var intento = 1; ; intento++)
         {
             try
             {
-                await IntentarCopiarAsync(origen, destino, relativa, relativaDestino, verificar, archivo, progreso, cancelacion);
-                return;
+                return await IntentarCopiarAsync(origen, destino, relativa, relativaDestino, verificar, archivo, progreso, cancelacion);
             }
             catch (Exception error) when (EstaEnUso(error, origen, destino, relativa, relativaDestino) && intento < Reintentos)
             {
@@ -77,8 +84,8 @@ public static class CopiaSegura
     private static (UbicacionDisco Origen, UbicacionDisco Destino)? EntreDiscos(IUbicacion origen, IUbicacion destino) =>
         origen is UbicacionDisco discoOrigen && destino is UbicacionDisco discoDestino ? (discoOrigen, discoDestino) : null;
 
-    private static async Task IntentarCopiarAsync(
-        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, bool verificar,
+    private static async Task<bool> IntentarCopiarAsync(
+        IUbicacion origen, IUbicacion destino, string relativa, string relativaDestino, Func<bool> verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         var temporal = relativaDestino + ExtensionTemporal;
@@ -88,15 +95,17 @@ public static class CopiaSegura
             archivo.Reiniciar("Copiando");
             if (EntreDiscos(origen, destino) is { } discos)
             {
-                await CopiarEntreDiscosAsync(discos.Origen, discos.Destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
+                var verificada = await CopiarEntreDiscosAsync(discos.Origen, discos.Destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
                 // La copia de Windows ya trae fechas y atributos: volver a leerlos y ponerlos solo costaría tiempo por archivo.
                 destino.Reemplazar(temporal, relativaDestino, MetadatosArchivo.YaCopiados);
+
+                return verificada;
             }
-            else
-            {
-                await CopiarPorFlujoAsync(origen, destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
-                destino.Reemplazar(temporal, relativaDestino, origen.LeerMetadatos(relativa));
-            }
+
+            var verificadaPorFlujo = await CopiarPorFlujoAsync(origen, destino, relativa, temporal, verificar, archivo, progreso, cancelacion);
+            destino.Reemplazar(temporal, relativaDestino, origen.LeerMetadatos(relativa));
+
+            return verificadaPorFlujo;
         }
         catch
         {
@@ -109,38 +118,52 @@ public static class CopiaSegura
     /// Disco, USB o red en los dos lados: copia Windows (lo más rápido, y en un mismo servidor copia el servidor) y,
     /// si se verifica, se leen origen y copia del disco mismo y se comparan las huellas.
     /// </summary>
-    private static async Task CopiarEntreDiscosAsync(
-        UbicacionDisco origen, UbicacionDisco destino, string relativa, string temporal, bool verificar,
+    private static async Task<bool> CopiarEntreDiscosAsync(
+        UbicacionDisco origen, UbicacionDisco destino, string relativa, string temporal, Func<bool> verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         var rutaOrigen = origen.RutaIO(relativa);
         var rutaTemporal = destino.RutaIO(temporal);
         await CopiaNativa.CopiarAsync(rutaOrigen, rutaTemporal, archivo.Tamano >= UmbralSinCache, bytes => progreso.SumarBytes(archivo, bytes), cancelacion);
-        if (!verificar)
+        if (!verificar())
         {
-            return;
+            return false;
         }
 
         archivo.Reiniciar("Verificando SHA-256");
-        void Sumar(int leidos) => progreso.SumarVerificacion(archivo, leidos, lecturas: 2);
+        void Sumar(int leidos) => SumarVerificacion(archivo, progreso, leidos, lecturas: 2, verificar);
         string huellaOrigen, huellaCopia;
-        if (MismoDiscoMecanico(origen, destino))
+        try
         {
-            // Un cabezal saltando entre dos archivos a la vez va mucho más lento que leerlos uno tras otro.
-            huellaOrigen = await CalculadoraHash.CalcularDelDiscoAsync(rutaOrigen, Sumar, cancelacion);
-            huellaCopia = await CalculadoraHash.CalcularDelDiscoAsync(rutaTemporal, Sumar, cancelacion);
+            if (MismoDiscoMecanico(origen, destino))
+            {
+                // Un cabezal saltando entre dos archivos a la vez va mucho más lento que leerlos uno tras otro.
+                huellaOrigen = await CalculadoraHash.CalcularDelDiscoAsync(rutaOrigen, Sumar, cancelacion);
+                huellaCopia = await CalculadoraHash.CalcularDelDiscoAsync(rutaTemporal, Sumar, cancelacion);
+            }
+            else
+            {
+                var huellas = await Task.WhenAll(
+                    CalculadoraHash.CalcularDelDiscoAsync(rutaOrigen, Sumar, cancelacion),
+                    CalculadoraHash.CalcularDelDiscoAsync(rutaTemporal, Sumar, cancelacion));
+                (huellaOrigen, huellaCopia) = (huellas[0], huellas[1]);
+            }
         }
-        else
+        catch (VerificacionApagadaException)
         {
-            var huellas = await Task.WhenAll(
-                CalculadoraHash.CalcularDelDiscoAsync(rutaOrigen, Sumar, cancelacion),
-                CalculadoraHash.CalcularDelDiscoAsync(rutaTemporal, Sumar, cancelacion));
-            (huellaOrigen, huellaCopia) = (huellas[0], huellas[1]);
+            return false;
         }
 
-        if (huellaCopia != huellaOrigen)
+        return huellaCopia == huellaOrigen ? true : throw new CopiaNoIdenticaException();
+    }
+
+    /// <summary>Avanza la fila y, si se apagó la verificación, la corta ahí mismo.</summary>
+    private static void SumarVerificacion(ArchivoEnCurso archivo, ProgresoOperacion progreso, int leidos, int lecturas, Func<bool> verificar)
+    {
+        progreso.SumarVerificacion(archivo, leidos, lecturas);
+        if (!verificar())
         {
-            throw new CopiaNoIdenticaException();
+            throw new VerificacionApagadaException();
         }
     }
 
@@ -148,27 +171,33 @@ public static class CopiaSegura
         origen.Perfil.NumeroDisco is { } numero && numero == destino.Perfil.NumeroDisco && origen.Perfil.Medio == MedioDisco.Mecanico;
 
     /// <summary>Con un teléfono de por medio: se lee y escribe a mano, calculando la huella del origen en la misma lectura.</summary>
-    private static async Task CopiarPorFlujoAsync(
-        IUbicacion origen, IUbicacion destino, string relativa, string temporal, bool verificar,
+    private static async Task<bool> CopiarPorFlujoAsync(
+        IUbicacion origen, IUbicacion destino, string relativa, string temporal, Func<bool> verificar,
         ArchivoEnCurso archivo, ProgresoOperacion progreso, CancellationToken cancelacion)
     {
         string huellaOrigen;
-        await using (var lectura = new FlujoMedido(origen.AbrirLectura(relativa), leidos => progreso.SumarBytes(archivo, leidos), calcularHuella: verificar))
+        await using (var lectura = new FlujoMedido(origen.AbrirLectura(relativa), leidos => progreso.SumarBytes(archivo, leidos), calcularHuella: verificar()))
         {
             await destino.EscribirAsync(temporal, lectura, cancelacion);
             huellaOrigen = lectura.Huella();
         }
 
-        if (!verificar)
+        if (!verificar())
         {
-            return;
+            return false;
         }
 
         archivo.Reiniciar("Verificando SHA-256");
-        var huellaCopia = await CalculadoraHash.CalcularAsync(destino, temporal, leidos => progreso.SumarVerificacion(archivo, leidos, lecturas: 1), cancelacion);
-        if (huellaCopia != huellaOrigen)
+        try
         {
-            throw new CopiaNoIdenticaException();
+            var huellaCopia = await CalculadoraHash.CalcularAsync(
+                destino, temporal, leidos => SumarVerificacion(archivo, progreso, leidos, lecturas: 1, verificar), cancelacion);
+
+            return huellaCopia == huellaOrigen ? true : throw new CopiaNoIdenticaException();
+        }
+        catch (VerificacionApagadaException)
+        {
+            return false;
         }
     }
 

@@ -43,7 +43,9 @@ public static class EscanerCarpetas
     {
         try
         {
-            return ubicacion.ListarCarpeta(carpeta).Where(entrada => !EsTemporalDeCopia(entrada) && !filtro.Excluye(Path.GetFileName(entrada.RutaRelativa)));
+            return ubicacion.ListarCarpeta(carpeta).ToList()
+                .Where(entrada => !(EsTemporalDeCopia(entrada) && Desechar(ubicacion, entrada)) && !filtro.Excluye(Path.GetFileName(entrada.RutaRelativa)))
+                .ToList();
         }
         catch (UnauthorizedAccessException) when (carpeta.Length > 0)
         {
@@ -55,9 +57,28 @@ public static class EscanerCarpetas
         }
     }
 
-    /// <summary>Lo que dejó una copia interrumpida (por ejemplo, un apagón) no es un archivo del usuario.</summary>
+    /// <summary>Lo que dejó una copia interrumpida (un apagón, la app cerrada de golpe) no es un archivo del usuario.</summary>
     private static bool EsTemporalDeCopia(EntradaEscaneada entrada) =>
         !entrada.EsCarpeta && entrada.RutaRelativa.EndsWith(CopiaSegura.ExtensionTemporal, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Se borra al encontrarlo: antes solo se saltaba y quedaba para siempre en el destino, ocupando espacio sin que
+    /// nadie lo viera (Victor, 2026-10-08). Si una copia en marcha lo tiene abierto, Windows no deja borrarlo y se
+    /// salta igual. Siempre devuelve true: no se muestra en ningún caso.
+    /// </summary>
+    private static bool Desechar(IUbicacion ubicacion, EntradaEscaneada temporal)
+    {
+        try
+        {
+            ubicacion.BorrarArchivo(temporal.RutaRelativa);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            // Abierto por una copia en marcha o sin permiso: se deja.
+        }
+
+        return true;
+    }
 
     private static void ContarEncontrada(EntradaEscaneada entrada, int cuantas, ProgresoOperacion progreso)
     {

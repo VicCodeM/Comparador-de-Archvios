@@ -27,8 +27,11 @@ public sealed record Configuracion
 
     public string Exclusiones { get; init; } = string.Empty;
 
-    /// <summary>Releer cada copia duplica el tiempo: queda para quien lo pida (Victor, 2026-10-08).</summary>
-    public bool VerificarCopias { get; init; }
+    /// <summary>
+    /// Releer cada copia casi duplica el tiempo: queda para quien lo pida (Victor, 2026-10-08). Nombre nuevo a
+    /// propósito: el antiguo "VerificarCopias" venía guardado en true y así se descarta y arranca apagado.
+    /// </summary>
+    public bool VerificarConHuella { get; init; }
 
     public TemaApp Tema { get; init; } = TemaApp.Sistema;
 

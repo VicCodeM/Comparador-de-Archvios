@@ -106,6 +106,8 @@
                            Text="Doble clic abre la copia. Clic derecho para más opciones." />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                             Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}}">
+                    <!-- A la vista mientras copia: apagarlo corta al instante también lo que ya se estaba verificando -->
+                    <ui:ToggleSwitch IsChecked="{Binding VerificarCopias}" Content="Verificar (SHA-256)" Margin="0,0,24,0" VerticalAlignment="Center" />
                     <ui:Button Command="{Binding PausarOReanudarCommand}" Margin="0,0,8,0" MinWidth="120">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Margin="0,0,8,0">

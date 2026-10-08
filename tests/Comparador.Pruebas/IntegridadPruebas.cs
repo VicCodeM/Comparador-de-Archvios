@@ -61,7 +61,7 @@ public sealed class IntegridadPruebas : IDisposable
         var progreso = new ProgresoOperacion();
         var archivo = progreso.Empezar(relativa, 0, "Copiando");
 
-        return CopiaSegura.CopiarAsync(new UbicacionDisco(carpetas.Origen), destino, relativa, relativa, verificar, archivo, progreso, CancellationToken.None);
+        return CopiaSegura.CopiarAsync(new UbicacionDisco(carpetas.Origen), destino, relativa, relativa, () => verificar, archivo, progreso, CancellationToken.None);
     }
 
     [Fact]
@@ -120,6 +120,39 @@ public sealed class IntegridadPruebas : IDisposable
             [new ParRutas(carpetas.Origen, carpetas.Destino)], new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
 
         Assert.Equal(["a.txt"], resultado.Elementos.Select(e => e.RutaRelativa));
+    }
+
+    /// <summary>Antes solo se saltaba y quedaba oculto para siempre en el destino (Victor, 2026-10-08).</summary>
+    [Fact]
+    public async Task El_temporal_de_una_copia_interrumpida_se_borra_del_destino()
+    {
+        CarpetasDePrueba.Escribir(carpetas.Origen, "a.txt", "a");
+        var resto = CarpetasDePrueba.Escribir(carpetas.Destino, "a.txt" + CopiaSegura.ExtensionTemporal, "resto de un cierre de golpe");
+
+        await new ComparadorCarpetas().CompararAsync(
+            [new ParRutas(carpetas.Origen, carpetas.Destino)], new OpcionesComparacion(), new ProgresoOperacion(), CancellationToken.None);
+
+        Assert.False(File.Exists(resto));
+    }
+
+    /// <summary>Apagar la verificación a mitad de un archivo la corta ahí mismo y la copia queda bien puesta.</summary>
+    [Fact]
+    public async Task Apagar_la_verificacion_a_mitad_de_un_archivo_la_corta_y_deja_la_copia()
+    {
+        var datos = new byte[8 * 1024 * 1024];
+        Random.Shared.NextBytes(datos);
+        File.WriteAllBytes(Path.Combine(carpetas.Origen, "datos.bin"), datos);
+        var consultas = 0;
+        var progreso = new ProgresoOperacion();
+        var archivo = progreso.Empezar("datos.bin", datos.Length, "Copiando");
+
+        var verificada = await CopiaSegura.CopiarAsync(
+            new UbicacionDisco(carpetas.Origen), new UbicacionDisco(carpetas.Destino), "datos.bin", "datos.bin",
+            () => ++consultas <= 2, archivo, progreso, CancellationToken.None);
+
+        Assert.False(verificada);
+        Assert.Equal(datos, File.ReadAllBytes(Path.Combine(carpetas.Destino, "datos.bin")));
+        Assert.Empty(Directory.GetFiles(carpetas.Destino, "*" + CopiaSegura.ExtensionTemporal));
     }
 
     [Fact]
