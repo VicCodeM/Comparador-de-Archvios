@@ -39,7 +39,6 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
         Verificar = config.VerificarCopias;
         SiYaExiste = config.SiYaExiste;
         HilosManuales = config.HilosAutomaticos ? null : config.Hilos;
-        EvitarSuspension = config.EvitarSuspension;
         Terminados = new TerminadosModeloVista(acciones);
         Acciones = acciones;
     }
@@ -53,8 +52,6 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
     private AccionesArchivo Acciones { get; }
 
     private int? HilosManuales { get; }
-
-    private bool EvitarSuspension { get; }
 
     /// <summary>Se dispara al terminar, para que la cola siga con el siguiente y la ventana decida si cerrarse.</summary>
     public event Action<TrabajoCopiaModeloVista>? Termino;
@@ -101,7 +98,7 @@ public sealed partial class TrabajoCopiaModeloVista : ObservableObject
         Progreso.Seguir(progreso, Terminados);
         Estado = EstadoTrabajo.Copiando;
         var reloj = Stopwatch.StartNew();
-        using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
+        using var suspension = PrevencionSuspension.Activar();
         try
         {
             var opciones = new OpcionesCopia { Verificar = Verificar, HilosManuales = HilosManuales, SiYaExiste = SiYaExiste };

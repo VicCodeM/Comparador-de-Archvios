@@ -137,7 +137,7 @@ public partial class App : Application
             principal.Show();
         }
 
-        principal.WindowState = principal.WindowState == WindowState.Minimized ? WindowState.Normal : principal.WindowState;
+        principal.WindowState = WindowState.Maximized;
         TraerAlFrente(principal);
     }
 

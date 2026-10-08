@@ -6,7 +6,7 @@
                  xmlns:vistas="clr-namespace:Comparador.App.Vistas"
                  Title="Espejo - Comparador y clonador"
                  Width="1280" Height="820" MinWidth="980" MinHeight="640"
-                 WindowStartupLocation="CenterScreen"
+                 WindowStartupLocation="CenterScreen" WindowState="Maximized"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica"
                  WindowCornerPreference="Round">

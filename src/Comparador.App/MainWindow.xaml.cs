@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using Comparador.App.ModelosVista;
 using Comparador.App.Servicios;
@@ -14,6 +15,14 @@ public partial class MainWindow
     {
         InitializeComponent();
         Loaded += (_, _) => Apariencia.Aplicar(((PrincipalModeloVista)DataContext).Tema);
+    }
+
+    /// <summary>Cerrar con una copia en marcha pregunta antes; si confirma, la copia se cancela.</summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        var principal = (PrincipalModeloVista)DataContext;
+        Dialogos.ConfirmarCierreSiCopia(this, e, principal.Copiando, () => principal.CancelarCommand.Execute(null));
+        base.OnClosing(e);
     }
 
     /// <summary>Con el menú angosto (solo iconos) el crédito no cabe y se partiría letra por letra: se oculta.</summary>

@@ -55,11 +55,10 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     [ObservableProperty] private bool modoExacto;
     [ObservableProperty] private bool detectarSobrantes = true;
     [ObservableProperty] private string exclusiones = string.Empty;
-    [ObservableProperty] private bool verificarCopias = true;
+    [ObservableProperty] private bool verificarCopias;
     [ObservableProperty] private TemaApp tema;
     [ObservableProperty] private bool hilosAutomaticos = true;
     [ObservableProperty] private double hilos = 4;
-    [ObservableProperty] private bool evitarSuspension = true;
     [ObservableProperty] private ReglaConflicto siYaExiste = ReglaConflicto.Reemplazar;
     [ObservableProperty] private bool enPausa;
     [ObservableProperty] private bool integradoExplorador = IntegracionExplorador.EstaInstalada();
@@ -177,7 +176,6 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Tema = config.Tema;
         HilosAutomaticos = config.HilosAutomaticos;
         Hilos = config.Hilos;
-        EvitarSuspension = config.EvitarSuspension;
         SiYaExiste = config.SiYaExiste;
         PegarConEspejo = config.PegarConEspejo;
         CargarRecientes();
@@ -214,7 +212,6 @@ public sealed partial class PrincipalModeloVista : ObservableObject
             Tema = Tema,
             HilosAutomaticos = HilosAutomaticos,
             Hilos = (int)Hilos,
-            EvitarSuspension = EvitarSuspension,
             SiYaExiste = SiYaExiste,
             PegarConEspejo = PegarConEspejo,
         };
@@ -230,8 +227,6 @@ public sealed partial class PrincipalModeloVista : ObservableObject
     }
 
     partial void OnVerificarCopiasChanged(bool value) => Guardar();
-
-    partial void OnEvitarSuspensionChanged(bool value) => Guardar();
 
     partial void OnSiYaExisteChanged(ReglaConflicto value) => Guardar();
 
@@ -416,7 +411,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         OperacionActual = Operacion.Comparando;
         PaginaActual = Pagina.Comparacion;
         cancelacion = new CancellationTokenSource();
-        using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
+        using var suspension = PrevencionSuspension.Activar();
         try
         {
             var resultado = await new ComparadorCarpetas().CompararAsync(pares, opciones, progreso, cancelacion.Token);
@@ -465,7 +460,7 @@ public sealed partial class PrincipalModeloVista : ObservableObject
         Revision.PausarAvisos();
         cancelacion = new CancellationTokenSource();
         var reloj = Stopwatch.StartNew();
-        using var suspension = EvitarSuspension ? PrevencionSuspension.Activar() : null;
+        using var suspension = PrevencionSuspension.Activar();
         try
         {
             var opciones = new OpcionesCopia

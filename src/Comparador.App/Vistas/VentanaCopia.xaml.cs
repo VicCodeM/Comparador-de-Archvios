@@ -78,14 +78,10 @@ public partial class VentanaCopia
         }
     }
 
-    /// <summary>Cerrar mientras copia cancela la copia (sin dejar nada a medias), igual que el botón Cancelar.</summary>
+    /// <summary>Cerrar mientras copia pregunta antes; si confirma, cancela la copia como el botón Cancelar.</summary>
     protected override void OnClosing(CancelEventArgs e)
     {
-        if (!Trabajo.Terminado)
-        {
-            Trabajo.CancelarCommand.Execute(null);
-        }
-
+        Dialogos.ConfirmarCierreSiCopia(this, e, !Trabajo.Terminado, () => Trabajo.CancelarCommand.Execute(null));
         base.OnClosing(e);
     }
 

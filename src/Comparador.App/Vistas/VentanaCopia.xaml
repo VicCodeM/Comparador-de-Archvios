@@ -35,11 +35,8 @@
                     <TextBlock Text="{Binding Detalle}" Style="{StaticResource TextoSecundario}" />
                     <TextBlock HorizontalAlignment="Right" Text="{Binding Velocidad}" Style="{StaticResource TextoSecundario}" />
                 </Grid>
-                <Grid Margin="0,6,0,0">
-                    <TextBlock Text="{Binding Restante}" FontWeight="SemiBold" />
-                    <TextBlock HorizontalAlignment="Right" Text="{Binding Hilos}" Style="{StaticResource TextoSecundario}" />
-                </Grid>
-                <TextBlock Margin="0,6,0,0" Style="{StaticResource TextoSecundario}"
+                <TextBlock Margin="0,6,0,0" Text="{Binding Restante}" FontWeight="SemiBold" />
+                <TextBlock Margin="0,6,0,0" Style="{StaticResource TextoSecundario}" TextTrimming="CharacterEllipsis"
                            Text="{Binding EnCurso[0].Nombre, StringFormat='Ahora: {0}', FallbackValue=''}" />
             </StackPanel>
 
@@ -47,17 +44,25 @@
             <ui:InfoBar Title="{Binding Resumen}" Severity="{Binding Severidad}" IsOpen="True" IsClosable="False"
                         Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}}" />
 
-            <!-- Botones -->
-            <Grid Margin="0,14,0,0">
+            <!-- Lo elegido en "⋯", en su propia línea: antes iba junto a los botones y se encimaba sobre ellos -->
+            <TextBlock Margin="0,12,0,0" Style="{StaticResource TextoSecundario}" Text="{Binding DescripcionOpciones}"
+                       TextTrimming="CharacterEllipsis" ToolTip="{Binding DescripcionOpciones}" />
+
+            <!-- Botones: cada uno en su columna, nada se monta encima de otro -->
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <ui:Button x:Name="BotonOpciones" Click="AbrirOpciones" Appearance="Transparent" ToolTip="Más opciones">
                     <ui:SymbolIcon Symbol="MoreHorizontal24" />
                     <ui:Button.ContextMenu>
                         <ContextMenu x:Name="MenuOpciones" Placement="Top" />
                     </ui:Button.ContextMenu>
                 </ui:Button>
-                <TextBlock Margin="44,0,0,0" VerticalAlignment="Center" Style="{StaticResource TextoSecundario}" Text="{Binding DescripcionOpciones}" />
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                <StackPanel Grid.Column="2" Orientation="Horizontal"
                             Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}, ConverterParameter=!}">
                     <ui:Button Command="{Binding PausarOReanudarCommand}" Margin="0,0,8,0" MinWidth="104"
                                IsEnabled="{Binding Copiando}">
@@ -76,7 +81,7 @@
                                ToolTip="Deja el archivo actual como estaba y sigue con los demás" />
                     <ui:Button Content="Cancelar" Command="{Binding CancelarCommand}" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                <StackPanel Grid.Column="2" Orientation="Horizontal"
                             Visibility="{Binding Terminado, Converter={StaticResource BoolAVisible}}">
                     <ui:Button Content="Abrir destino" Command="{Binding AbrirDestinoCommand}" Margin="0,0,8,0" />
                     <ui:Button Content="Cerrar" Appearance="Primary" Click="Cerrar" />
@@ -85,7 +90,9 @@
 
             <!-- Detalles: lo mismo que la página de copia, en pequeño -->
             <StackPanel Margin="0,14,0,0" Visibility="{Binding VerDetalles, Converter={StaticResource BoolAVisible}}">
-                <ItemsControl ItemsSource="{Binding Progreso.EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Progreso.EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+                </ScrollViewer>
                 <Border Style="{StaticResource Tarjeta}" Padding="8,4" Margin="0,8,0,0" Height="260">
                     <ui:ListView ItemsSource="{Binding Terminados.Lista}" ItemTemplate="{StaticResource PlantillaTerminado}"
                                  Background="Transparent" BorderThickness="0"

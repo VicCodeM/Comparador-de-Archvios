@@ -35,16 +35,6 @@
                 </ComboBox>
             </ui:CardControl>
 
-            <ui:CardControl Icon="{ui:SymbolIcon WeatherMoon24}" Margin="0,0,0,4">
-                <ui:CardControl.Header>
-                    <StackPanel>
-                        <TextBlock Text="Evitar que Windows se suspenda hasta terminar" FontSize="14" />
-                        <TextBlock Style="{StaticResource TextoSecundario}" TextWrapping="Wrap"
-                                   Text="Mientras se compara o se copia, el equipo no entra en suspensión aunque nadie lo toque. Al terminar vuelve a lo normal." />
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <ui:ToggleSwitch IsChecked="{Binding EvitarSuspension}" />
-            </ui:CardControl>
 
             <ui:CardExpander Icon="{ui:SymbolIcon Flash24}" IsExpanded="True">
                 <ui:CardExpander.Header>

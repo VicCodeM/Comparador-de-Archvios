@@ -27,7 +27,8 @@ public sealed record Configuracion
 
     public string Exclusiones { get; init; } = string.Empty;
 
-    public bool VerificarCopias { get; init; } = true;
+    /// <summary>Releer cada copia duplica el tiempo: queda para quien lo pida (Victor, 2026-10-08).</summary>
+    public bool VerificarCopias { get; init; }
 
     public TemaApp Tema { get; init; } = TemaApp.Sistema;
 
@@ -35,9 +36,6 @@ public sealed record Configuracion
     public bool HilosAutomaticos { get; init; } = true;
 
     public int Hilos { get; init; } = 4;
-
-    /// <summary>Que Windows no se suspenda mientras se compara o se copia (se vuelve a permitir al terminar).</summary>
-    public bool EvitarSuspension { get; init; } = true;
 
     /// <summary>Qué hacer si el archivo ya existe en el destino y es distinto.</summary>
     public ReglaConflicto SiYaExiste { get; init; } = ReglaConflicto.Reemplazar;

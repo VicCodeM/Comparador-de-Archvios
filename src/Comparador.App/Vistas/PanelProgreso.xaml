@@ -38,7 +38,10 @@
                    Visibility="{Binding EnCurso.Count, Converter={StaticResource HayAlgoAVisible}}" />
         <Border Style="{StaticResource Tarjeta}" Padding="20,10"
                 Visibility="{Binding EnCurso.Count, Converter={StaticResource HayAlgoAVisible}}">
-            <ItemsControl ItemsSource="{Binding EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+            <!-- Con muchos hilos la lista empujaba los botones de abajo fuera de la pantalla: altura fija y desplazamiento -->
+            <ScrollViewer MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+            </ScrollViewer>
         </Border>
     </StackPanel>
 </UserControl>

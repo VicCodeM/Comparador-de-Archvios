@@ -166,8 +166,27 @@ public sealed partial class ProgresoModeloVista : ObservableObject
         bytesAnteriores = foto.BytesProcesados;
         momentoAnterior = foto.Transcurrido;
         Velocidad = $"{Formatos.Tamano((long)Math.Max(velocidadSuavizada, 0))}/s";
-        Restante = velocidadSuavizada > 0
-            ? "Faltan unos " + Formatos.Duracion(TimeSpan.FromSeconds((foto.BytesTotal - foto.BytesProcesados) / velocidadSuavizada))
-            : "Calculando el tiempo restante...";
+        Restante = DescribirRestante(foto.BytesTotal - foto.BytesProcesados);
     }
+
+    /// <summary>
+    /// En pausa la velocidad cae casi a cero y el tiempo restante salía infinito: TimeSpan se desbordaba y cerraba la
+    /// app de golpe (Visor de eventos, 2026-10-08). Por debajo de 1 KB/s o más allá de un mes no se da cifra.
+    /// </summary>
+    private string DescribirRestante(long bytesFaltantes)
+    {
+        if (velocidadSuavizada < VelocidadMinimaParaEstimar)
+        {
+            return "Calculando el tiempo restante...";
+        }
+
+        var segundos = bytesFaltantes / velocidadSuavizada;
+
+        return segundos > SegundosMaximosEstimables
+            ? "Faltan más de 30 días"
+            : "Faltan unos " + Formatos.Duracion(TimeSpan.FromSeconds(segundos));
+    }
+
+    private const double VelocidadMinimaParaEstimar = 1024;
+    private const double SegundosMaximosEstimables = 30 * 24 * 3600;
 }
