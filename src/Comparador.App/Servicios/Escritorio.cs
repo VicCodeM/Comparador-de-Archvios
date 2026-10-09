@@ -7,8 +7,26 @@ namespace Comparador.App.Servicios;
 /// <summary>Lo que la app le pide a Windows: elegir carpetas, guardar archivos, abrir y mostrar en el Explorador.</summary>
 public static class Escritorio
 {
-    /// <summary>El diálogo de Windows ya deja elegir memorias USB, unidades de red y rutas \\servidor\carpeta.</summary>
+    /// <summary>
+    /// El diálogo de Windows ya deja elegir memorias USB, unidades de red y rutas \\servidor\carpeta. Si la carpeta
+    /// inicial ya no existe (una unidad desconectada, una ruta de teléfono mtp:), Windows lanza un error que cerraba
+    /// Espejo de golpe al pulsar Examinar (2026-10-08): entonces se abre sin carpeta inicial. No se comprueba antes con
+    /// Directory.Exists porque con una red caída tarda decenas de segundos.
+    /// </summary>
     public static string? ElegirCarpeta(string titulo, string? inicial = null)
+    {
+        try
+        {
+            return MostrarElegirCarpeta(titulo, inicial);
+        }
+        catch (Exception error) when (!string.IsNullOrWhiteSpace(inicial)
+            && error is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException)
+        {
+            return MostrarElegirCarpeta(titulo, inicial: null);
+        }
+    }
+
+    private static string? MostrarElegirCarpeta(string titulo, string? inicial)
     {
         var dialogo = new OpenFolderDialog { Title = titulo, Multiselect = false };
         if (!string.IsNullOrWhiteSpace(inicial))

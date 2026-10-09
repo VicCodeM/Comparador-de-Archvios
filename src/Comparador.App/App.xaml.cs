@@ -20,6 +20,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += AlFallarSinControl;
         if (e.Args is ["--desinstalar"])
         {
             // Lo llama el desinstalador: nada de Espejo debe quedar en el Explorador ni en el arranque de Windows.
@@ -151,6 +152,28 @@ public partial class App : Application
         ventana.Activate();
         ventana.Topmost = false;
         ventana.Focus();
+    }
+
+    /// <summary>
+    /// Red de seguridad: un error que nadie atrapó cerraba Espejo de golpe, a veces con una copia en marcha. Se anota en
+    /// %LocalAppData%\VMSofts\Espejo\errores.log, se avisa y la app sigue abierta. No sustituye arreglar cada causa.
+    /// </summary>
+    private static void AlFallarSinControl(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            var carpeta = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VMSofts", "Espejo");
+            System.IO.Directory.CreateDirectory(carpeta);
+            System.IO.File.AppendAllText(System.IO.Path.Combine(carpeta, "errores.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {e.Exception}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch (Exception error) when (error is System.IO.IOException or UnauthorizedAccessException)
+        {
+            // Sin poder anotarlo, al menos se avisa abajo.
+        }
+
+        MessageBox.Show($"Algo falló, pero Espejo sigue abierto:{Environment.NewLine}{Environment.NewLine}{e.Exception.Message}",
+            "Espejo", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     /// <summary>Suelta los teléfonos al salir: si no, Windows los deja "ocupados" hasta desconectarlos.</summary>
