@@ -1,13 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using Comparador.App.ModelosVista;
 using Comparador.App.Vistas;
 using Comparador.Nucleo.Modelos;
 
 namespace Comparador.Pruebas;
 
-/// <summary>La pantalla de copia montada de verdad. WPF exige un solo hilo STA: todo se mide dentro del mismo.</summary>
+/// <summary>La pantalla de copia montada de verdad, en el hilo de ventana compartido.</summary>
 public sealed class PantallaCopiaPruebas
 {
     private const double AltoMinimoContenido = 760;
@@ -20,7 +19,7 @@ public sealed class PantallaCopiaPruebas
     [Fact]
     public void Con_muchos_archivos_en_curso_se_ven_los_terminados_los_botones_y_se_llega_al_final()
     {
-        var medidas = EnHiloDeVentana(() => new[] { 880.0, 600.0 }.Select(alto => (alto, Medir(alto, enCurso: 6, terminados: 11))).ToList());
+        var medidas = HiloDeVentana.Ejecutar(() => new[] { 880.0, 600.0 }.Select(alto => (alto, Medir(alto, enCurso: 6, terminados: 11))).ToList());
 
         foreach (var (alto, (altoTerminados, _, finBotones, desplazable)) in medidas)
         {
@@ -37,7 +36,7 @@ public sealed class PantallaCopiaPruebas
     [Fact]
     public void Al_empezar_la_copia_ya_se_ven_las_dos_listas_aunque_esten_vacias()
     {
-        var (altoTerminados, altoEnCurso, _, _) = EnHiloDeVentana(() => Medir(880, enCurso: 0, terminados: 0));
+        var (altoTerminados, altoEnCurso, _, _) = HiloDeVentana.Ejecutar(() => Medir(880, enCurso: 0, terminados: 0));
 
         Assert.True(altoEnCurso >= 150, $"La lista de lo que se copia mide {altoEnCurso:0} px");
         Assert.True(altoTerminados >= 150, $"La lista de terminados mide {altoTerminados:0} px");
@@ -59,12 +58,11 @@ public sealed class PantallaCopiaPruebas
         principal.OperacionActual = Operacion.Copiando;
 
         var vista = new VistaCopia { DataContext = principal };
-        // Los enlaces se aplican en la cola del hilo: sin vaciarla se mediría la pantalla sin sus visibilidades reales.
-        vista.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, () => { });
+        HiloDeVentana.VaciarCola(vista);
         vista.Measure(new Size(1500, alto));
         vista.Arrange(new Rect(0, 0, 1500, alto));
         vista.UpdateLayout();
-        var cancelar = Descendientes(vista).OfType<Wpf.Ui.Controls.Button>().First(boton => boton.Content as string == "Cancelar");
+        var cancelar = HiloDeVentana.Descendientes(vista).OfType<Wpf.Ui.Controls.Button>().First(boton => boton.Content as string == "Cancelar");
         var medida = (
             ((FrameworkElement)vista.FindName("ListaTerminados")).ActualHeight,
             ((FrameworkElement)vista.FindName("ListaEnCurso")).ActualHeight,
@@ -73,48 +71,5 @@ public sealed class PantallaCopiaPruebas
         principal.Progreso.Detener();
 
         return medida;
-    }
-
-    /// <summary>
-    /// Un solo hilo STA, vivo para todas las pruebas de pantalla: los recursos de la app (estilos, pinceles) quedan
-    /// atados al hilo que los creó, y otra prueba en otro hilo fallaría al tocarlos.
-    /// </summary>
-    private static readonly Lazy<System.Windows.Threading.Dispatcher> HiloDeVentana = new(() =>
-    {
-        System.Windows.Threading.Dispatcher? despachador = null;
-        using var listo = new ManualResetEventSlim();
-        var hilo = new Thread(() =>
-        {
-            // Solo los estilos, nunca la App de Espejo: crear la App y arrancar el hilo ejecuta su arranque real, que
-            // escribió en el registro de Victor el arranque con Windows apuntando a testhost.exe y abrió avisos en su
-            // pantalla (2026-10-08). Las pruebas no tocan nada real del usuario.
-            var recursos = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }.Resources.MergedDictionaries;
-            recursos.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = Wpf.Ui.Appearance.ApplicationTheme.Dark });
-            recursos.Add(new Wpf.Ui.Markup.ControlsDictionary());
-            recursos.Add((ResourceDictionary)Application.LoadComponent(new Uri("/Espejo;component/Vistas/Estilos.xaml", UriKind.Relative)));
-            despachador = System.Windows.Threading.Dispatcher.CurrentDispatcher;
-            listo.Set();
-            System.Windows.Threading.Dispatcher.Run();
-        }) { IsBackground = true };
-        hilo.SetApartmentState(ApartmentState.STA);
-        hilo.Start();
-        listo.Wait();
-
-        return despachador!;
-    });
-
-    private static T EnHiloDeVentana<T>(Func<T> trabajo) => HiloDeVentana.Value.Invoke(trabajo);
-
-    private static IEnumerable<DependencyObject> Descendientes(DependencyObject raiz)
-    {
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(raiz); i++)
-        {
-            var hijo = VisualTreeHelper.GetChild(raiz, i);
-            yield return hijo;
-            foreach (var nieto in Descendientes(hijo))
-            {
-                yield return nieto;
-            }
-        }
     }
 }

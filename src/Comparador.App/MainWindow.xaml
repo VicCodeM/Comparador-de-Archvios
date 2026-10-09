@@ -25,7 +25,7 @@
 
         <ui:TitleBar Title="Espejo - Comparador y clonador">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/app.ico" />
+                <ui:ImageIcon Source="pack://application:,,,/Espejo;component/app.ico" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 

@@ -13,7 +13,7 @@
     <StackPanel>
         <ui:TitleBar Title="{Binding Titulo}" ShowMaximize="False">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/app.ico" />
+                <ui:ImageIcon Source="pack://application:,,,/Espejo;component/app.ico" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
@@ -26,14 +26,23 @@
             <!-- Avance -->
             <StackPanel DataContext="{Binding Progreso}"
                         Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolAVisible}}">
+                <!-- Cada fila con dos datos va en columnas: un texto largo se recorta, nunca se monta sobre el otro -->
                 <Grid>
-                    <TextBlock Text="{Binding Fase}" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock HorizontalAlignment="Right" FontSize="16" FontWeight="SemiBold" Text="{Binding Porcentaje, StringFormat='{}{0:0}%'}" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Fase}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+                    <TextBlock Grid.Column="1" FontSize="16" FontWeight="SemiBold" Text="{Binding Porcentaje, StringFormat='{}{0:0}%'}" />
                 </Grid>
                 <ProgressBar Margin="0,10" Height="4" Maximum="100" Value="{Binding Porcentaje, Mode=OneWay}" IsIndeterminate="{Binding Indeterminado}" />
                 <Grid>
-                    <TextBlock Text="{Binding Detalle}" Style="{StaticResource TextoSecundario}" />
-                    <TextBlock HorizontalAlignment="Right" Text="{Binding Velocidad}" Style="{StaticResource TextoSecundario}" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Detalle}" Style="{StaticResource TextoSecundario}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Velocidad}" Style="{StaticResource TextoSecundario}" />
                 </Grid>
                 <TextBlock Margin="0,6,0,0" Text="{Binding Restante}" FontWeight="SemiBold" />
                 <TextBlock Margin="0,6,0,0" Style="{StaticResource TextoSecundario}" TextTrimming="CharacterEllipsis"
