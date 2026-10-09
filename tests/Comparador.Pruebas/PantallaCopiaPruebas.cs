@@ -85,7 +85,13 @@ public sealed class PantallaCopiaPruebas
         using var listo = new ManualResetEventSlim();
         var hilo = new Thread(() =>
         {
-            new Comparador.App.App().InitializeComponent();
+            // Solo los estilos, nunca la App de Espejo: crear la App y arrancar el hilo ejecuta su arranque real, que
+            // escribió en el registro de Victor el arranque con Windows apuntando a testhost.exe y abrió avisos en su
+            // pantalla (2026-10-08). Las pruebas no tocan nada real del usuario.
+            var recursos = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }.Resources.MergedDictionaries;
+            recursos.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = Wpf.Ui.Appearance.ApplicationTheme.Dark });
+            recursos.Add(new Wpf.Ui.Markup.ControlsDictionary());
+            recursos.Add((ResourceDictionary)Application.LoadComponent(new Uri("/Espejo;component/Vistas/Estilos.xaml", UriKind.Relative)));
             despachador = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             listo.Set();
             System.Windows.Threading.Dispatcher.Run();
