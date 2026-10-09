@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -21,9 +20,9 @@ public sealed class PantallaCopiaPruebas
     [Fact]
     public void Con_muchos_archivos_en_curso_se_ven_los_terminados_los_botones_y_se_llega_al_final()
     {
-        var medidas = EnHiloDeVentana(() => new[] { 880.0, 600.0 }.Select(alto => (alto, Medir(alto))).ToList());
+        var medidas = EnHiloDeVentana(() => new[] { 880.0, 600.0 }.Select(alto => (alto, Medir(alto, enCurso: 6, terminados: 11))).ToList());
 
-        foreach (var (alto, (altoTerminados, finBotones, desplazable)) in medidas)
+        foreach (var (alto, (altoTerminados, _, finBotones, desplazable)) in medidas)
         {
             Assert.True(altoTerminados >= 150, $"Con {alto} px la lista de terminados mide {altoTerminados:0} px");
             Assert.True(finBotones <= alto, $"Con {alto} px los botones acaban en {finBotones:0} px, fuera de la pantalla");
@@ -31,28 +30,44 @@ public sealed class PantallaCopiaPruebas
         }
     }
 
-    private static (double AltoTerminados, double FinBotones, double Desplazable) Medir(double alto)
+    /// <summary>
+    /// Al empezar la copia no hay nada en curso ni terminado todavía: las dos listas deben verse igual, vacías, y no
+    /// aparecer de golpe cuando llega el primer archivo (Victor, 2026-10-08).
+    /// </summary>
+    [Fact]
+    public void Al_empezar_la_copia_ya_se_ven_las_dos_listas_aunque_esten_vacias()
+    {
+        var (altoTerminados, altoEnCurso, _, _) = EnHiloDeVentana(() => Medir(880, enCurso: 0, terminados: 0));
+
+        Assert.True(altoEnCurso >= 150, $"La lista de lo que se copia mide {altoEnCurso:0} px");
+        Assert.True(altoTerminados >= 150, $"La lista de terminados mide {altoTerminados:0} px");
+    }
+
+    private static (double AltoTerminados, double AltoEnCurso, double FinBotones, double Desplazable) Medir(double alto, int enCurso, int terminados)
     {
         var principal = new PrincipalModeloVista();
         var progreso = new ProgresoOperacion();
         progreso.IniciarFase("Copiando", 20, 20L * 700_000_000);
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < enCurso; i++)
         {
             progreso.Empezar($@"Temporada 1\capitulo {i}.mkv", 700_000_000, "Copiando");
         }
 
         principal.Progreso.Seguir(progreso, principal.Terminados);
-        principal.Terminados.Agregar([.. Enumerable.Range(0, 11).Select(i => new ArchivoTerminado(
+        principal.Terminados.Agregar([.. Enumerable.Range(0, terminados).Select(i => new ArchivoTerminado(
             $@"Temporada 2\capitulo {i}.mkv", "", "", 700_000_000, ResultadoArchivo.Copiado, "Copiado", DateTime.Now))]);
         principal.OperacionActual = Operacion.Copiando;
 
         var vista = new VistaCopia { DataContext = principal };
+        // Los enlaces se aplican en la cola del hilo: sin vaciarla se mediría la pantalla sin sus visibilidades reales.
+        vista.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, () => { });
         vista.Measure(new Size(1500, alto));
         vista.Arrange(new Rect(0, 0, 1500, alto));
         vista.UpdateLayout();
         var cancelar = Descendientes(vista).OfType<Wpf.Ui.Controls.Button>().First(boton => boton.Content as string == "Cancelar");
         var medida = (
             ((FrameworkElement)vista.FindName("ListaTerminados")).ActualHeight,
+            ((FrameworkElement)vista.FindName("ListaEnCurso")).ActualHeight,
             cancelar.TranslatePoint(new Point(0, cancelar.ActualHeight), vista).Y,
             ((ScrollViewer)vista.FindName("Desplazamiento")).ScrollableHeight);
         principal.Progreso.Detener();
@@ -60,33 +75,29 @@ public sealed class PantallaCopiaPruebas
         return medida;
     }
 
-    private static T EnHiloDeVentana<T>(Func<T> trabajo)
+    /// <summary>
+    /// Un solo hilo STA, vivo para todas las pruebas de pantalla: los recursos de la app (estilos, pinceles) quedan
+    /// atados al hilo que los creó, y otra prueba en otro hilo fallaría al tocarlos.
+    /// </summary>
+    private static readonly Lazy<System.Windows.Threading.Dispatcher> HiloDeVentana = new(() =>
     {
-        T resultado = default!;
-        ExceptionDispatchInfo? fallo = null;
+        System.Windows.Threading.Dispatcher? despachador = null;
+        using var listo = new ManualResetEventSlim();
         var hilo = new Thread(() =>
         {
-            try
-            {
-                if (Application.Current is null)
-                {
-                    new Comparador.App.App().InitializeComponent();
-                }
-
-                resultado = trabajo();
-            }
-            catch (Exception error)
-            {
-                fallo = ExceptionDispatchInfo.Capture(error);
-            }
-        });
+            new Comparador.App.App().InitializeComponent();
+            despachador = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            listo.Set();
+            System.Windows.Threading.Dispatcher.Run();
+        }) { IsBackground = true };
         hilo.SetApartmentState(ApartmentState.STA);
         hilo.Start();
-        hilo.Join();
-        fallo?.Throw();
+        listo.Wait();
 
-        return resultado;
-    }
+        return despachador!;
+    });
+
+    private static T EnHiloDeVentana<T>(Func<T> trabajo) => HiloDeVentana.Value.Invoke(trabajo);
 
     private static IEnumerable<DependencyObject> Descendientes(DependencyObject raiz)
     {

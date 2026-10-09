@@ -84,11 +84,22 @@ public sealed partial class TerminadosModeloVista(AccionesArchivo acciones) : Ob
         Refrescar();
     }
 
-    partial void OnCorrectosChanged(int value) => OnPropertyChanged(nameof(Total));
+    /// <summary>Con la lista vacía: si todavía no termina ninguno, dónde van a aparecer; si no, que el filtro los oculta.</summary>
+    public string MensajeSinFilas => Total == 0
+        ? "Aquí aparecen los archivos en cuanto terminan de copiarse"
+        : "Nada coincide con el filtro o la búsqueda";
 
-    partial void OnFallidosChanged(int value) => OnPropertyChanged(nameof(Total));
+    partial void OnCorrectosChanged(int value) => AvisarTotal();
 
-    partial void OnSaltadosChanged(int value) => OnPropertyChanged(nameof(Total));
+    partial void OnFallidosChanged(int value) => AvisarTotal();
+
+    partial void OnSaltadosChanged(int value) => AvisarTotal();
+
+    private void AvisarTotal()
+    {
+        OnPropertyChanged(nameof(Total));
+        OnPropertyChanged(nameof(MensajeSinFilas));
+    }
 
     partial void OnFiltroChanged(FiltroTerminados value) => Refrescar();
 

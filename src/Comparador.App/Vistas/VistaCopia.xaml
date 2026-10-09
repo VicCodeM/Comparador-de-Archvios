@@ -42,18 +42,23 @@
              derecha lo terminado. Cada una con su propio desplazamiento; ninguna aplasta a la otra. Al terminar la
              copia la izquierda se oculta y los terminados ocupan todo el ancho (UniformGrid no cuenta lo oculto). -->
         <UniformGrid Grid.Row="1" Rows="1" Margin="32,0,32,16">
+        <!-- Las dos listas se ven desde que empieza la copia, aunque aún estén vacías (Victor, 2026-10-08) -->
         <DockPanel Margin="8,0" DataContext="{Binding Progreso}"
-                   Visibility="{Binding EnCurso.Count, Converter={StaticResource HayAlgoAVisible}}">
+                   Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolAVisible}}">
             <TextBlock DockPanel.Dock="Top" Text="Ahora mismo" Style="{StaticResource TituloSeccion}" />
             <Border Style="{StaticResource Tarjeta}" Padding="20,10">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
-                </ScrollViewer>
+                <Grid>
+                    <ScrollViewer x:Name="ListaEnCurso" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+                    </ScrollViewer>
+                    <TextBlock Text="Preparando los archivos..." HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Style="{StaticResource TextoSecundario}"
+                               Visibility="{Binding EnCurso.Count, Converter={StaticResource HayAlgoAVisible}, ConverterParameter=!}" />
+                </Grid>
             </Border>
         </DockPanel>
 
-        <DockPanel Margin="8,0" DataContext="{Binding Terminados}"
-                   Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
+        <DockPanel Margin="8,0" DataContext="{Binding Terminados}">
         <!-- Filtros y búsqueda de lo terminado -->
         <Grid DockPanel.Dock="Top" Margin="0,20,0,10">
             <Grid.RowDefinitions>
@@ -113,7 +118,7 @@
                         </ContextMenu>
                     </ui:ListView.ContextMenu>
                 </ui:ListView>
-                <TextBlock Text="Nada coincide con el filtro o la búsqueda" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <TextBlock Text="{Binding MensajeSinFilas}" HorizontalAlignment="Center" VerticalAlignment="Center"
                            Style="{StaticResource TextoSecundario}"
                            Visibility="{Binding Lista.Count, Converter={StaticResource HayAlgoAVisible}, ConverterParameter=!}" />
             </Grid>
