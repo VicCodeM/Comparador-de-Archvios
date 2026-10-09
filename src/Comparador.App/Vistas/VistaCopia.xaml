@@ -6,10 +6,18 @@
              xmlns:mv="clr-namespace:Comparador.App.ModelosVista">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Desplazamiento general: si la ventana es baja, la página entera baja hasta el final. Mientras cabe, el
+             contenido ocupa justo el alto visible y las dos listas se reparten el espacio. Los botones van fuera,
+             siempre a la vista. -->
+        <ScrollViewer x:Name="Desplazamiento" VerticalScrollBarVisibility="Auto">
+        <Grid MinHeight="760" Height="{Binding ViewportHeight, ElementName=Desplazamiento}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Avance (mientras copia) o resumen (al terminar) -->
@@ -24,26 +32,38 @@
             </StackPanel>
             <TextBlock Text="Copia terminada" Style="{StaticResource TituloPagina}"
                        Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
-            <vistas:PanelProgreso DataContext="{Binding Progreso}"
+            <vistas:PanelProgreso DataContext="{Binding Progreso}" MostrarEnCurso="False"
                                   Visibility="{Binding DataContext.Copiando, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolAVisible}}" />
             <ui:InfoBar Title="{Binding ResumenCopia}" Severity="{Binding SeveridadCopia}" IsOpen="True" IsClosable="False"
                         Visibility="{Binding Copiando, Converter={StaticResource BoolAVisible}, ConverterParameter=!}" />
         </StackPanel>
 
+        <!-- Las dos listas lado a lado (idea de Victor, 2026-10-08): a la izquierda lo que se copia ahora mismo, a la
+             derecha lo terminado. Cada una con su propio desplazamiento; ninguna aplasta a la otra. Al terminar la
+             copia la izquierda se oculta y los terminados ocupan todo el ancho (UniformGrid no cuenta lo oculto). -->
+        <UniformGrid Grid.Row="1" Rows="1" Margin="32,0,32,16">
+        <DockPanel Margin="8,0" DataContext="{Binding Progreso}"
+                   Visibility="{Binding EnCurso.Count, Converter={StaticResource HayAlgoAVisible}}">
+            <TextBlock DockPanel.Dock="Top" Text="Ahora mismo" Style="{StaticResource TituloSeccion}" />
+            <Border Style="{StaticResource Tarjeta}" Padding="20,10">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding EnCurso}" ItemTemplate="{StaticResource PlantillaEnCurso}" />
+                </ScrollViewer>
+            </Border>
+        </DockPanel>
+
+        <DockPanel Margin="8,0" DataContext="{Binding Terminados}"
+                   Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
         <!-- Filtros y búsqueda de lo terminado -->
-        <Grid Grid.Row="1" DataContext="{Binding Terminados}" Margin="40,20,40,10"
-              Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
+        <Grid DockPanel.Dock="Top" Margin="0,20,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Style="{StaticResource TituloSeccion}" Margin="2,0,0,8">
+            <TextBlock Style="{StaticResource TituloSeccion}" Margin="2,0,0,8" TextTrimming="CharacterEllipsis">
                 <Run Text="Terminados" />
-                <Run Text="(se muestran los últimos 200 mientras copia; al terminar, todos)" FontWeight="Normal" FontSize="12"
+                <Run Text="(los últimos 200 mientras copia; al terminar, todos)" FontWeight="Normal" FontSize="12"
                      Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </TextBlock>
             <WrapPanel Grid.Row="1">
@@ -60,14 +80,13 @@
                     <TextBlock><Run Text="Con error " /><Run Text="{Binding Fallidos, Mode=OneWay, StringFormat=N0}" FontWeight="SemiBold" /></TextBlock>
                 </ToggleButton>
             </WrapPanel>
-            <ui:TextBox Grid.Row="1" Grid.Column="1" Width="340" Margin="0,0,0,6" VerticalAlignment="Top"
+            <ui:TextBox Grid.Row="2" Margin="0,8,0,0"
                         Text="{Binding Busqueda, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Buscar por nombre o carpeta"
                         Icon="{ui:SymbolIcon Search24}" ClearButtonEnabled="True" />
         </Grid>
 
         <!-- La lista: clic derecho para abrir, mostrar en el Explorador, copiar la ruta o ver quién lo usa -->
-        <Border Grid.Row="2" DataContext="{Binding Terminados}" Style="{StaticResource Tarjeta}" Padding="8,4" Margin="40,0,40,16"
-                Visibility="{Binding Total, Converter={StaticResource HayAlgoAVisible}}">
+        <Border Style="{StaticResource Tarjeta}" Padding="8,4">
             <Grid>
                 <ui:ListView x:Name="ListaTerminados" ItemsSource="{Binding Lista}" ItemTemplate="{StaticResource PlantillaTerminado}"
                              SelectionMode="Single" Background="Transparent" BorderThickness="0"
@@ -100,7 +119,12 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="3" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
+        </DockPanel>
+        </UniformGrid>
+        </Grid>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="40,14">
             <Grid>
                 <TextBlock VerticalAlignment="Center" Style="{StaticResource TextoSecundario}"
                            Text="Doble clic abre la copia. Clic derecho para más opciones." />
